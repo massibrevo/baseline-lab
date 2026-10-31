@@ -107,6 +107,7 @@ function draw(){
   $('#time').textContent=fmt(v.currentTime);$('#playhead').style.left=`${v.currentTime/result.metadata.duration_s*100}%`;
   $('#timeline').setAttribute('aria-valuenow',String(Math.round(v.currentTime/result.metadata.duration_s*100)));
   const canvas=$<HTMLCanvasElement>('#overlay');canvas.width=result.metadata.width;canvas.height=result.metadata.height;
+  const box=$('#video-wrap').getBoundingClientRect();const fit=Math.min(box.width/canvas.width,box.height/canvas.height);canvas.style.width=`${canvas.width*fit}px`;canvas.style.height=`${canvas.height*fit}px`;canvas.style.left=`${(box.width-canvas.width*fit)/2}px`;canvas.style.top=`${(box.height-canvas.height*fit)/2}px`;canvas.style.right='auto';canvas.style.bottom='auto';
   const c=canvas.getContext('2d')!;const scale=result.metadata.width/1000;
   c.lineWidth=2*scale;c.font=`${13*scale}px monospace`;
   if(overlays.Court && result.calibration){const points=result.calibration.corners_px;c.strokeStyle='rgba(243,240,230,.8)';c.beginPath();points.forEach((p:number[],i:number)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.stroke();}

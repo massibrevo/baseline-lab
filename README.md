@@ -4,6 +4,8 @@
 
 Upload one short singles rally, inspect its real presentation timestamps, calibrate four court corners, queue CPU analysis, review synchronized overlays and uncertain contact candidates, correct events, and export the evidence. Private processing runs on your machine. The hosted Site is a clearly labeled, precomputed public demonstration.
 
+[Open the deployed demo](https://baseline-lab-massibrevo.maxbrevini.chatgpt.site) · [Public source](https://github.com/massibrevo/baseline-lab) · [Passed Linux CI](https://github.com/massibrevo/baseline-lab/actions/runs/41223338708)
+
 ![Baseline Lab analysis desk](docs/workspace.png)
 
 This is an experimental first release, **not a validated tennis perception system**. The ball baseline produces false positives; the distant player is frequently missed. A high observed-track coverage is not accuracy. See [executed verification](docs/verification.md), [provisional measurements](docs/evaluation-provisional.json), and [model selection](docs/model-selection.md).
