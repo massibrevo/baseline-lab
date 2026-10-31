@@ -1,0 +1,13 @@
+# Security and private media
+
+This release supports **loopback local processing** and a **static public-example Site**. It does not implement multi-user hosted authentication. Do not place the local API on a public port or serve it through an unauthenticated tunnel.
+
+A signed random browser identity uses an HttpOnly SameSite=Strict cookie. The key is generated in the private data directory, mode 0600. Every session/file/event/job route checks ownership; unauthorized IDs return 404. Modifications require a custom CSRF header and restrict browser Origin; only localhost/127.0.0.1 Host headers are accepted. This protects browser workspaces, not users from other accounts/processes able to read the same filesystem. Clearing the cookie loses access to existing sessions; there is no recovery login in this release.
+
+Uploads use generated paths, no arbitrary remote URLs, MP4/MOV extension plus real decoding, pre-parser content-length/body limits, post-parser exact file-byte limits, isolated decoder timeout, frame/duration/pixel bounds, safe subprocess argument arrays, one inference child, a wall timeout and cooperative/forced cancellation. Content-length is mandatory for session multipart upload; oversized bodies get 413. These are bounded defense-in-depth measures, not a claim that native media decoding is a security sandbox. For untrusted third-party footage, use an isolated non-root container with OS CPU/memory limits. Host CLI decoding is not kernel-isolated. Docker execution was not assumed merely because a Dockerfile exists.
+
+Artifacts stay under `data/sessions/<generated id>/`, never in public static directories. The worker writes a per-job partial directory and publishes only on success. Signed artifact URLs are unnecessary locally: the cookie ownership check is required on every request, including video range requests. Secrets never belong in query strings, frontend bundles, screenshots or logs. The app neither trains on uploads nor calls paid providers.
+
+Delete denies access immediately, scrubs session content fields, flags cancellation, and removes active artifacts once their worker exits. Startup clears tombstoned directories and interrupted partial output. SQLite tombstone/job IDs remain for operational integrity; old deleted bytes may persist in SQLite pages/WAL or external backups. For stronger erasure, stop all app processes, remove the private data directory/volume and manage your OS backups/encryption. Automatic retention scheduling and recoverable-account deletion are not implemented.
+
+For a security issue, use the repository's private vulnerability reporting if enabled. Do not attach private match videos, tokens or session artifacts to public issues.

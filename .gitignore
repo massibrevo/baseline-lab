@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+data/
+.env
+*.pth
+*.pt
+*.onnx
+*.download
+node_modules/
+apps/web/dist/
+.openai/local*
+.openai/*.local.*
+.DS_Store

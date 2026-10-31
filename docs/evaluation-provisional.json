@@ -1,0 +1,91 @@
+{
+  "annotation_method": "Provisional visual point annotations by Codex during implementation, before inspecting the release result; not independently verified human ground truth.",
+  "pipeline_elapsed_s": 84.614,
+  "frames": 375,
+  "duration_s": 12.5,
+  "detection_coverage_not_accuracy": {
+    "ball": 0.6906666666666667,
+    "near": 0.9386666666666666,
+    "far": 0.13333333333333333
+  },
+  "candidate_events": 8,
+  "bounce_precision": null,
+  "court_independent_error_px": null,
+  "ball_speed_m_s": null,
+  "splits": {
+    "tuning_frames": {
+      "ball": {
+        "n_labeled": 3,
+        "missing": 1,
+        "hits_within_tolerance": 2,
+        "tolerance_px": 15,
+        "median_error_when_observed_px": 1.25,
+        "errors_px": [
+          2.0,
+          0.5
+        ]
+      },
+      "near": {
+        "n_labeled": 3,
+        "missing": 0,
+        "hits_within_tolerance": 3,
+        "tolerance_px": 35,
+        "median_error_when_observed_px": 10.559082513256035,
+        "errors_px": [
+          10.559082513256035,
+          3.717031589578734,
+          14.745035415816917
+        ]
+      },
+      "far": {
+        "n_labeled": 3,
+        "missing": 2,
+        "hits_within_tolerance": 1,
+        "tolerance_px": 35,
+        "median_error_when_observed_px": 3.794282835611321,
+        "errors_px": [
+          3.794282835611321
+        ]
+      }
+    },
+    "validation_frames": {
+      "ball": {
+        "n_labeled": 4,
+        "missing": 1,
+        "hits_within_tolerance": 2,
+        "tolerance_px": 15,
+        "median_error_when_observed_px": 0.5,
+        "errors_px": [
+          74.20411039827916,
+          0.5,
+          0.0
+        ]
+      },
+      "near": {
+        "n_labeled": 6,
+        "missing": 0,
+        "hits_within_tolerance": 6,
+        "tolerance_px": 35,
+        "median_error_when_observed_px": 9.103527299527325,
+        "errors_px": [
+          7.177480646293889,
+          8.220193863765722,
+          9.986860735288928,
+          3.056786633887217,
+          17.20238087855663,
+          17.312569957235038
+        ]
+      },
+      "far": {
+        "n_labeled": 6,
+        "missing": 5,
+        "hits_within_tolerance": 1,
+        "tolerance_px": 35,
+        "median_error_when_observed_px": 14.36812238529846,
+        "errors_px": [
+          14.36812238529846
+        ]
+      }
+    }
+  }
+}

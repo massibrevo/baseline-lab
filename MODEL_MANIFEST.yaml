@@ -1,0 +1,47 @@
+schema_version: '1.0'
+player:
+  adapter: SSDPlayers
+  architecture: ssdlite320_mobilenet_v3_large
+  revision: torchvision-0.29.2 / COCO_V1
+  url: https://download.pytorch.org/models/ssdlite320_mobilenet_v3_large_coco-a79551df.pth
+  filename: ssdlite320_mobilenet_v3_large_coco-a79551df.pth
+  sha256: a79551df90c79834bcd3bb3845ef9d966b5449a3a9b2833ae8404778ca5d65d2
+  size_bytes: 14069355
+  serialization: pytorch state_dict; torch.load(weights_only=True); no remote code
+  code_license: BSD-3-Clause (torchvision); BSD-style (PyTorch)
+  weight_license: No separate permissive weights grant asserted; review official pretrained-model and COCO terms
+  training_data: COCO train2017; underlying image rights vary
+  class_mapping: {1: person}
+  preprocess: RGB float32 [0,1]; torchvision internal 320x320 normalization; overlapping 60%-image tiles above width 960; output boxes offset to display pixels; cross-tile NMS IoU 0.4
+  confidence_threshold: 0.35
+  device: cpu; 2 torch threads
+  downloads: explicit setup-models only; cached offline thereafter
+  redistribution: not included in Git or Sites; separately fetched by user
+fallback:
+  adapter: HOGPlayers
+  model: OpenCV built-in default people HOG+SVM
+  version: opencv-python-headless 4.12.0.88
+  license: Apache-2.0 distribution; upstream notices apply
+  performance: not validated for distant tennis athletes
+ball:
+  adapter: ColorMotionBall
+  revision: color-motion-v1
+  weights: none
+  license: MIT (original implementation)
+  preprocess: original display BGR pixels; HSV yellow/white AND positive frame difference; initial static-white exclusion; circularity/local contrast; detected-person exclusion
+  score_semantics: heuristic circularity/local-contrast score, not probability
+  association: prediction gate; 200ms reacquisition; interpolation at most 3 frames and 100ms
+  limitations: white clothing, lines, spectators, blur, occlusion, tiny balls, lighting
+court:
+  method: manual four labeled singles outside-painted corners; validated geometry math only
+  automatic_calibration: unavailable; no court keypoint weights selected
+  accuracy: manual uncertainty not independently measured; all line calls remain uncertain
+not_selected:
+  CourtSide:
+    revision: 2c66f41b89ec4614f652f52c1c9593d0c00a5fad
+    actual_filename: model.pt
+    sha256: be98152dc5ddcf5552d2b71ae6480d2c6bcf360a1f2369e21b4dc66da442dfcb
+    reason: no person or court keypoint classes; Ultralytics AGPL/enterprise and weight licensing unresolved
+    inference_providers_observed: []
+  WASB:
+    reason: temporal model worth evaluating; separate checkpoint/data rights not verified

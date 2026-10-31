@@ -1,0 +1,9 @@
+# Ordered next experiments
+
+1. **Independent labels and domain coverage.** Obtain consented fixed-baseline singles footage from at least three different courts, separate recordings by split, and independently verify ball/player/contact/court labels. Done: reproducible labeled manifest with rights, inter-annotator disagreement and failure cases. Prerequisite for any accuracy promise.
+2. **Temporal ball model.** Resolve WASB/TrackNet checkpoint/data terms and evaluate with the same label protocol against the color/motion baseline. Done: localization/recall/false-link results, runtime/memory and error examples on held-out footage; no detector-mAP-to-bounce inference.
+3. **Far athlete tracking.** Evaluate tiled resolution/threshold choices using tuning footage only; add association/occlusion tests. Done: measured identity failures and missing coverage per near/far player on independent clips.
+4. **Calibrated court method.** Label >4 known landmarks, verify automatic court-keypoint rights and compare held-out reprojection/ground errors. Done: independent uncertainty estimates and reliable drift/cut rejection. Only then consider line-call bands.
+5. **Contact timing.** Independently label hits/bounces/occlusions, evaluate tolerance-based precision/recall and location error separately. Done: justified bounce metrics, retained human corrections and no unvalidated speed.
+6. **Hosted private processing.** Provision authenticated HTTPS service/persistent storage, gateway and two-account end-to-end privacy tests described in hosting.md. Done: a real tested upload/export/delete workflow and priced capacity limits.
+7. **Longer footage and research.** Segment cuts/multiple rallies before extending duration; then consider doubles, stroke classification, pose, OCR, 3D reconstruction and highlights. Each needs its own validation and usable interface; no decorative future controls.

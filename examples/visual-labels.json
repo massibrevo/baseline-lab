@@ -1,0 +1,25 @@
+{
+  "schema_version":"1.0",
+  "clip":"commons-stabilized.mp4",
+  "annotation_method":"Provisional visual point annotations by Codex during implementation, before inspecting the release result; not independently verified human ground truth.",
+  "coordinate_system":"displayed original 1280x720 pixels; player points approximate midpoint of lowest visible feet",
+  "ball_tolerance_px":15,
+  "player_tolerance_px":35,
+  "tuning_frames":[
+    {"frame":15,"ball":[209,454],"near":[167,580],"far":[964,395]},
+    {"frame":45,"ball":[959,393],"near":[236,625],"far":[996,390]},
+    {"frame":75,"ball":[447,512],"near":[116,643],"far":[985,383]}
+  ],
+  "validation_frames":[
+    {"frame":195,"ball":[982,349],"near":[210,670],"far":[1032,376]},
+    {"frame":225,"ball":[427,539],"near":[224,656],"far":[994,370]},
+    {"frame":255,"ball":null,"near":[216,648],"far":[1004,370]},
+    {"frame":285,"ball":[995,335],"near":[205,653],"far":[1158,391]},
+    {"frame":315,"ball":[327,645],"near":[185,685],"far":[1060,383]},
+    {"frame":345,"ball":null,"near":[194,690],"far":[970,370]}
+  ],
+  "null_semantics":"ball location not reliably visible; excluded, not a negative label",
+  "bounce_ground_truth":null,
+  "independent_court_landmarks":null,
+  "limitations":"Same venue and source recording across the temporal split. No domain-general accuracy, bounce precision, or court accuracy claim is justified. Independent human verification and private-camera validation remain required."
+}
