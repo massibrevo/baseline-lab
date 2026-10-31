@@ -8,9 +8,13 @@ import time
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from baseline_lab.analytics.events import candidates
 from baseline_lab.analytics.live import live_metrics
+from baseline_lab.analytics.quality import update_quality
+from baseline_lab.analytics.shots import shot_signals
+from baseline_lab.analytics.speed import research_speed
 from baseline_lab.contracts import Calibration, Result
 from baseline_lab.geometry.court import Court
 from baseline_lab.rendering.export import annotated, csvs
@@ -18,7 +22,10 @@ from baseline_lab.settings import Settings
 from baseline_lab.tracking.association import BallAssociation, Players, interpolate, summarize
 from baseline_lab.video.media import frames, inspect, preview
 from baseline_lab.video.stability import CameraStability
+from baseline_lab.vision.ball import BALL_SHA, TemporalBall
 from baseline_lab.vision.detectors import MODEL_SHA, ColorMotionBall, HOGPlayers, SSDPlayers
+from baseline_lab.vision.people import flow_people, player_regions
+from baseline_lab.vision.pose import POSE_SHA, PoseEstimator, far_player_regions
 
 
 def analyze(
@@ -27,24 +34,37 @@ def analyze(
     cfg: Settings,
     calibration: Calibration | None = None,
     checkpoint=lambda stage, done, total: None,
+    real_time_playback: bool = False,
 ) -> Result:
     start = time.monotonic()
+    timings: dict[str, float] = {}
     output.mkdir(parents=True, exist_ok=True)
     checkpoint("validating", 0, None)
     metadata = inspect(source, cfg)
-    court = Court(calibration) if calibration else None
+    reference_court = Court(calibration) if calibration else None
+    court = reference_court
+    frame_calibrations = []
     checkpoint("loading_model", 0, None)
     detector = (
         SSDPlayers(cfg.data_dir / "models") if cfg.player_model == "ssdlite" else HOGPlayers()
     )
-    ball_detector = ColorMotionBall()
-    association = BallAssociation(math.hypot(metadata.width, metadata.height))
+    pose = PoseEstimator(cfg.data_dir / "models") if cfg.player_model == "ssdlite" else None
+    if court and isinstance(detector, SSDPlayers):
+        detector.focus_regions = far_player_regions(court, metadata.width, metadata.height)
+    ball_detector = (
+        TemporalBall(cfg.data_dir / "models")
+        if cfg.player_model == "ssdlite"
+        else ColorMotionBall()
+    )
+    association = BallAssociation(
+        math.hypot(metadata.width, metadata.height), neural=cfg.player_model == "ssdlite"
+    )
     players = Players(court, metadata.width, metadata.height)
     ball = []
     raw = []
     previous = None
     warnings = [
-        "Ball: experimental color/motion baseline, not validated for arbitrary footage",
+        "Ball: temporal tennis heatmap model; arbitrary-footage accuracy is not validated",
         "Bounce candidates are not confirmed contact events",
         "Player footpoints and measured contiguous-path distance are approximate",
         "Line calls remain uncertain: independent calibration error is not measured",
@@ -56,8 +76,26 @@ def analyze(
     stability = None
     calibration_invalidated = False
     motion_checks = []
-    for i, (t, _, _, _, image) in enumerate(frames(source)):
+    reference_image = None
+    neural_detections = None
+    heat_start = time.monotonic()
+    if isinstance(ball_detector, TemporalBall):
+        neural_detections = []
+        batch = []
+        for _, _, _, _, image in frames(source, cfg.max_pixels, cfg.max_source_pixels):
+            batch.append(image)
+            if len(batch) == 3:
+                neural_detections.extend(ball_detector.detect_batch(batch))
+                batch = []
+                checkpoint("ball_heatmaps", len(neural_detections), metadata.frames)
+        if batch:
+            neural_detections.extend(ball_detector.detect_batch(batch))
+    timings["ball_heatmaps_s"] = time.monotonic() - heat_start
+    tracking_start = time.monotonic()
+    for i, (t, _, _, _, image) in enumerate(frames(source, cfg.max_pixels, cfg.max_source_pixels)):
         checkpoint("detecting_and_tracking", i, metadata.frames)
+        if reference_image is None:
+            reference_image = image.copy()
         hist = cv2.calcHist([image], [0, 1], None, [24, 24], [0, 256, 0, 256])
         cv2.normalize(hist, hist)
         if (
@@ -70,45 +108,84 @@ def analyze(
         previous_hist = hist
         if stability is None:
             stability = CameraStability(image)
+        mapping = stability.mapping(image) if reference_court else None
+        court = None
+        details = None
+        if mapping is not None and reference_court:
+            transform, drift, residual = mapping
+            if drift < metadata.width * 0.15:
+                transformed = cv2.perspectiveTransform(
+                    np.array([reference_court.corners], np.float32), transform
+                )[0]
+                try:
+                    court = Court(Calibration(corners_px=transformed.tolist()))
+                    details = court.details()
+                    details.update({"registration_residual_px": residual, "camera_drift_px": drift})
+                except ValueError:
+                    pass
         if i % 15 == 0:
-            drift = stability.drift(image)
-            motion_checks.append({"t_s": t, "drift_px": drift})
-            if (drift is None or drift > 8) and court is not None:
-                calibration_invalidated = True
-                court = None
-                players.court = None
-                warnings.append(
-                    f"Calibration invalidated at {t:.3f}s: camera moved or could not be verified"
-                )
-        player_detections = detector.detect(image)
-        detections = ball_detector.detect(image, previous)
-        detections = [
-            d
-            for d in detections
-            if not any(
-                p["bbox"][0] - 8 <= d["xy"][0] <= p["bbox"][2] + 8
-                and p["bbox"][1] - 8 <= d["xy"][1] <= p["bbox"][3] + 8
-                for p in player_detections
+            motion_checks.append(
+                {
+                    "t_s": t,
+                    "drift_px": mapping[1] if mapping else None,
+                    "registration_residual_px": mapping[2] if mapping else None,
+                }
             )
-        ]
+        if reference_court and court is None:
+            calibration_invalidated = True
+        frame_calibrations.append(details)
+        players.court = court
+        player_detections: list[dict] = []
+        if previous is not None and i % 6 and cfg.player_model == "ssdlite":
+            player_detections = flow_people(
+                previous, image, [v[-1] for v in players.points.values()]
+            )
+        if len(player_detections) < 2:
+            regions: list[tuple[int, int, int, int]] | None = (
+                player_regions(
+                    [v[-1] for v in players.points.values()], metadata.width, metadata.height
+                )
+                if i % 30 and previous is not None and isinstance(detector, SSDPlayers)
+                else None
+            )
+            player_detections = (
+                detector.detect(image, regions)
+                if isinstance(detector, SSDPlayers)
+                else detector.detect(image)
+            )
+            if regions and len(player_detections) < 2:
+                player_detections = detector.detect(image)
+        detections = (
+            neural_detections[i]
+            if neural_detections is not None
+            else ball_detector.detect(image, previous)
+        )
+        # Keep candidates near a racket/player: blanket person-box suppression
+        # removed the actual ball around impacts. Temporal association rejects clutter.
         detections = [
             d for d in detections if 0.08 * metadata.height < d["xy"][1] < 0.98 * metadata.height
         ]
         if court:
-            import numpy as np
-
-            polygon = np.asarray(court.corners, np.float32)
+            # Image ROI includes airborne space above the far baseline. A ground
+            # polygon is not a valid exclusion mask for an airborne ball.
+            top = min(y for _, y in court.corners) - 0.3 * metadata.height
+            left = min(x for x, _ in court.corners) - 0.2 * metadata.width
+            right = max(x for x, _ in court.corners) + 0.2 * metadata.width
             detections = [
-                d for d in detections if cv2.pointPolygonTest(polygon, d["xy"], True) >= -50
+                d for d in detections if d["xy"][1] >= top and left <= d["xy"][0] <= right
             ]
         raw.append({"frame": i, "t_s": t, "candidates": detections})
         ball.append(association.update(detections, t, i))
         players.update(player_detections, t, i)
+        if pose:
+            for identity, observations in players.points.items():
+                pose.estimate(image, observations[-1], court, identity=identity)
         previous = image
+    timings["tracking_and_pose_s"] = time.monotonic() - tracking_start
     if calibration_invalidated:
-        for observations in players.points.values():
-            for observation in observations:
-                observation.court_m = None
+        warnings.append(
+            "Camera registration failed on some frames; ground metrics missing for those frames"
+        )
     interpolate(ball)
     checkpoint("deriving_events", 0, None)
     events = candidates(ball, list(players.points.values()))
@@ -118,15 +195,24 @@ def analyze(
         metadata=metadata,
         tracks=tracks,
         events=events,
-        calibration=court.details() if court else None,
+        calibration=reference_court.details() if reference_court else None,
+        frame_calibrations=frame_calibrations,
         warnings=warnings,
         provenance={
-            "pipeline": "cpu-baseline-v1",
+            "pipeline": "neural-tracking-v2",
             "player_detector": cfg.player_model,
+            "pose_model": "rtmpose-m-body7-simcc-17" if pose else None,
+            "pose_sha256": POSE_SHA if pose else None,
             "weights_sha256": MODEL_SHA if cfg.player_model == "ssdlite" else None,
-            "ball_detector": "color-motion-v1",
+            "ball_detector": "WASB-HRNet-tennis-batched-triplets"
+            if cfg.player_model == "ssdlite"
+            else "color-motion-v2-temporal",
+            "ball_weights_sha256": BALL_SHA if cfg.player_model == "ssdlite" else None,
+            "ball_device": ball_detector.device
+            if isinstance(ball_detector, TemporalBall)
+            else "cpu",
             "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-            "device": "cpu",
+            "device": detector.device if isinstance(detector, SSDPlayers) else "cpu",
             "dependencies": {
                 name: importlib.metadata.version(name)
                 for name in ["torch", "torchvision", "opencv-python-headless", "av", "numpy"]
@@ -138,11 +224,19 @@ def analyze(
         },
         elapsed_s=0,
     )
+    update_quality(result)
     result.live_metrics = live_metrics(result)
+    result.shots = shot_signals(result)
+    result.ball_speed_estimates, result.speed_analysis = research_speed(
+        result, reference_image, real_time_playback
+    )
     (output / "raw-detections.json").write_text(json.dumps(raw))
+    render_start = time.monotonic()
     annotated(source, output / "annotated.mp4", result, checkpoint)
+    timings["annotated_export_s"] = time.monotonic() - render_start
     checkpoint("preparing_playback", 0, None)
-    preview(source, output / "review.mp4")
+    preview(source, output / "review.mp4", (metadata.width, metadata.height))
+    result.provenance["stage_timings_s"] = {k: round(v, 3) for k, v in timings.items()}
     result.elapsed_s = round(time.monotonic() - start, 3)
     (output / "result.json").write_text(result.model_dump_json())
     csvs(result, output)

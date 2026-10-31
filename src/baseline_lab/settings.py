@@ -14,8 +14,9 @@ class Settings(BaseSettings):
     min_duration_s: float = 5
     max_duration_s: float = 30
     max_pixels: int = 1920 * 1080
+    max_source_pixels: int = 4096 * 2160
     max_frames: int = 1800
-    job_timeout_s: int = 300
+    job_timeout_s: int = 900
     player_model: str = "ssdlite"
     secure_cookies: bool = False
     allowed_origins: list[str] = ["http://127.0.0.1:8000", "http://localhost:8000"]

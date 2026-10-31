@@ -15,14 +15,23 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from baseline_lab.analytics.live import live_metrics
+from baseline_lab.analytics.quality import update_quality
 from baseline_lab.api.auth import mint, owner, secret
 from baseline_lab.api.camera import camera_router
-from baseline_lab.contracts import Correction, Event, Result, Submission
+from baseline_lab.contracts import (
+    Correction,
+    Event,
+    Result,
+    ShotReview,
+    ShotSignal,
+    StrokeAnnotation,
+    Submission,
+)
 from baseline_lab.geometry.court import Court
 from baseline_lab.rendering.export import csvs
 from baseline_lab.settings import ROOT, Settings, settings
 from baseline_lab.storage.database import Database
-from baseline_lab.video.media import isolated_probe
+from baseline_lab.video.media import MEDIA_ERRORS, isolated_probe
 
 ARTIFACTS = {
     "annotated.mp4",
@@ -32,6 +41,10 @@ ARTIFACTS = {
     "tracks.csv",
     "raw-detections.json",
     "live-metrics.csv",
+    "ball-speed.csv",
+    "shot-quality.csv",
+    "keypoints.csv",
+    "shots.csv",
 }
 
 
@@ -114,6 +127,7 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
             "private_processing": True,
             "max_upload_mb": cfg.max_upload_mb,
             "max_duration_s": cfg.max_duration_s,
+            "max_source_pixels": cfg.max_source_pixels,
             "worker_alive": db.worker_alive(),
             "csrf_header": "X-Baseline-Request: 1",
         }
@@ -160,7 +174,14 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
             raise
         except (ValueError, OSError, TimeoutError, TimeoutExpired) as exc:
             shutil.rmtree(directory, ignore_errors=True)
-            raise HTTPException(422, f"media_validation_failed: {str(exc)[-500:]}") from exc
+            code = (
+                "media_import_timeout"
+                if isinstance(exc, (TimeoutExpired, TimeoutError))
+                else str(exc)
+            )
+            if code not in MEDIA_ERRORS:
+                code = "invalid_or_unsupported_video"
+            raise HTTPException(422, {"code": code, "message": MEDIA_ERRORS[code]}) from exc
 
     @app.get("/api/v1/sessions/{sid}")
     def get_session(sid: str, identity: str = Depends(owner)):
@@ -179,7 +200,11 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
     @app.get("/api/v1/sessions/{sid}/source")
     def source(sid: str, identity: str = Depends(owner)):
         session(sid, identity)
-        return FileResponse(cfg.data_dir / "sessions" / sid / "source", media_type="video/mp4")
+        directory = cfg.data_dir / "sessions" / sid
+        return FileResponse(
+            directory / ("ingest.mp4" if (directory / "ingest.mp4").exists() else "source"),
+            media_type="video/mp4",
+        )
 
     @app.post("/api/v1/sessions/{sid}/jobs", status_code=202)
     def submit(sid: str, body: Submission, identity: str = Depends(owner)):
@@ -251,6 +276,65 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
             content_disposition_type="inline" if name.endswith("mp4") else "attachment",
         )
 
+    @app.post("/api/v1/sessions/{sid}/jobs/{jid}/shots", response_model=Result)
+    def annotate_stroke(sid: str, jid: str, body: StrokeAnnotation, identity: str = Depends(owner)):
+        row = session(sid, identity)
+        metadata = json.loads(row["metadata"])
+        if body.t_s > metadata["duration_s"]:
+            raise HTTPException(422, "stroke_outside_clip")
+        directory = result_path(sid, jid)
+        import fcntl
+
+        with (directory / ".edit.lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            result = Result.model_validate_json((directory / "result.json").read_text())
+            frame = min(
+                range(len(metadata["timestamps_s"])),
+                key=lambda i: abs(metadata["timestamps_s"][i] - body.t_s),
+            )
+            result.shots.append(
+                ShotSignal(
+                    id="manual-stroke-" + secrets.token_hex(6),
+                    t_s=body.t_s,
+                    frame=frame,
+                    player=body.player,
+                    kind=body.kind,
+                    status="reviewed",
+                    evidence_score=1,
+                    score_semantics="human label, not model probability",
+                    method="human-reviewed video stroke",
+                )
+            )
+            result.shots.sort(key=lambda s: s.t_s)
+            temp = directory / "result.edit.json"
+            temp.write_text(result.model_dump_json())
+            temp.replace(directory / "result.json")
+            csvs(result, directory)
+        return result
+
+    @app.patch("/api/v1/sessions/{sid}/jobs/{jid}/shots/{shot_id}", response_model=Result)
+    def review_shot(
+        sid: str, jid: str, shot_id: str, body: ShotReview, identity: str = Depends(owner)
+    ):
+        session(sid, identity)
+        directory = result_path(sid, jid)
+        import fcntl
+
+        with (directory / ".edit.lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            result = Result.model_validate_json((directory / "result.json").read_text())
+            shot = next((s for s in result.shots if s.id == shot_id), None)
+            if shot is None:
+                raise HTTPException(404, "shot_not_found")
+            if shot.original_prediction is None:
+                shot.original_prediction = shot.model_dump(exclude={"original_prediction"})
+            shot.kind, shot.status = body.kind, "reviewed"
+            temp = directory / "result.edit.json"
+            temp.write_text(result.model_dump_json())
+            temp.replace(directory / "result.json")
+            csvs(result, directory)
+        return result
+
     def edit_event(sid: str, jid: str, eid: str | None, body: Correction, identity: str):
         row = session(sid, identity)
         directory = result_path(sid, jid)
@@ -291,16 +375,23 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
                 )
                 result.events.append(event)
             event.court_m = None
-            if event.status in {"confirmed", "manual"} and result.calibration:
+            calibration = (
+                result.frame_calibrations[frame]
+                if result.frame_calibrations
+                else result.calibration
+            )
+            if event.status in {"confirmed", "manual"} and calibration:
                 from baseline_lab.contracts import Calibration
 
-                court = Court(Calibration(corners_px=result.calibration["corners_px"]))
+                court = Court(Calibration(corners_px=calibration["corners_px"]))
                 event.court_m = court.project(event.xy_px)
             event.shot_depth_m = (
                 min(event.court_m[1], 23.77 - event.court_m[1]) if event.court_m else None
             )
             event.classification = "uncertain"
-            result.schema_version = "1.1"
+            event.shot_evidence = body.shot_evidence
+            result.schema_version = "1.3"
+            update_quality(result)
             result.live_metrics = live_metrics(result)
             temp = directory / "result.edit.json"
             temp.write_text(result.model_dump_json())

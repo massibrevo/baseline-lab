@@ -11,45 +11,93 @@ def distance(a: Point, b: Point) -> float:
 
 
 class BallAssociation:
-    def __init__(self, diagonal: float):
-        self.last: list[Observation] = []
+    """Online beam of short tracklets; detections are never replaced by predictions.
+
+    New tracks need three temporally coherent samples. Competing moving blobs
+    remain hypotheses, with velocity residuals and stationary clutter penalties.
+    Real timestamp gaps expire hypotheses rather than inventing camera samples.
+    """
+
+    def __init__(self, diagonal: float, neural: bool = False):
         self.diagonal = diagonal
+        self.minimum_travel = 0.003 if neural else 0.012
+        self.minimum_quality = 0.45 if neural else 0.6
+        self.hypotheses: list[tuple[list[Observation], float]] = []
+        self.emitted: Observation | None = None
 
     def update(self, candidates: list[dict], t: float, frame: int) -> Observation:
-        recent = self.last[-1] if self.last else None
-        if recent and t - recent.t_s > 0.20:
-            self.last = []
-            recent = None
-        prediction = recent.xy_px if recent else None
-        if len(self.last) >= 2:
-            a, b = self.last[-2:]
-            if a.xy_px and b.xy_px and b.t_s > a.t_s:
-                dt = (t - b.t_s) / (b.t_s - a.t_s)
-                prediction = (
-                    b.xy_px[0] + (b.xy_px[0] - a.xy_px[0]) * dt,
-                    b.xy_px[1] + (b.xy_px[1] - a.xy_px[1]) * dt,
-                )
-        chosen = None
-        if prediction and recent:
-            gate = self.diagonal * (0.02 + 2.0 * (t - recent.t_s))
-            viable = [c for c in candidates if distance(c["xy"], prediction) <= gate]
-            if viable:
-                chosen = min(viable, key=lambda c: distance(c["xy"], prediction))
-        elif candidates:
-            chosen = candidates[0]
-        if not chosen:
-            return Observation(t_s=t, frame=frame, state="missing", reason="no_plausible_link")
-        obs = Observation(
-            t_s=t,
-            frame=frame,
-            state="detected",
-            xy_px=chosen["xy"],
-            raw_xy_px=chosen["xy"],
-            score=chosen["score"],
-        )
-        self.last.append(obs)
-        self.last = self.last[-2:]
-        return obs
+        next_paths: list[tuple[list[Observation], float]] = []
+        for candidate in candidates[:40]:
+            point = Observation(
+                t_s=t,
+                frame=frame,
+                state="detected",
+                xy_px=candidate["xy"],
+                raw_xy_px=candidate["xy"],
+                apparent_diameter_px=candidate.get("diameter_px"),
+                score=candidate["score"],
+            )
+            next_paths.append(([point], candidate["score"] - 0.8))
+            for history, quality in self.hypotheses:
+                last = history[-1]
+                dt = t - last.t_s
+                if not 0 < dt <= 0.10 or last.xy_px is None:
+                    continue
+                step = distance(last.xy_px, candidate["xy"])
+                if step > self.diagonal * (0.006 + 3 * dt):
+                    continue
+                prediction = last.xy_px
+                if len(history) >= 2:
+                    before = history[-2]
+                    assert before.xy_px is not None
+                    ratio = dt / (last.t_s - before.t_s)
+                    prediction = (
+                        last.xy_px[0] + (last.xy_px[0] - before.xy_px[0]) * ratio,
+                        last.xy_px[1] + (last.xy_px[1] - before.xy_px[1]) * ratio,
+                    )
+                gate = self.diagonal * (0.008 + 0.8 * dt)
+                residual = distance(prediction, candidate["xy"])
+                if len(history) >= 2 and residual > gate:
+                    continue
+                path = (history + [point])[-5:]
+                assert path[0].xy_px is not None
+                travel = distance(path[0].xy_px, candidate["xy"])
+                stationary = len(path) >= 3 and travel < self.diagonal * self.minimum_travel
+                score = 0.8 * quality + 0.2 * candidate["score"] + 0.18 - 0.35 * residual / gate
+                if stationary:
+                    score -= 1.0
+                next_paths.append((path, score))
+        # Retain one best history per endpoint and starting frame, plus fresh starts.
+        ranked = sorted(next_paths, key=lambda item: item[1], reverse=True)
+        kept: list[tuple[list[Observation], float]] = []
+        signatures = set()
+        for path, quality in ranked:
+            signature = (path[-1].xy_px, min(3, len(path)))
+            if signature not in signatures:
+                signatures.add(signature)
+                kept.append((path, quality))
+            if len(kept) >= 32:
+                break
+        if not candidates:
+            kept = [(p, q - 0.2) for p, q in self.hypotheses if t - p[-1].t_s < 0.10]
+        self.hypotheses = kept
+        viable = [
+            (p, q)
+            for p, q in kept
+            if len(p) >= 3 and p[-1].frame == frame and q > self.minimum_quality
+        ]
+        if self.emitted and self.emitted.xy_px and t - self.emitted.t_s <= 0.10:
+            viable = [
+                (p, q)
+                for p, q in viable
+                if p[-1].xy_px
+                and distance(p[-1].xy_px, self.emitted.xy_px)
+                <= self.diagonal * (0.01 + 3 * (t - self.emitted.t_s))
+            ]
+        if viable:
+            self.emitted = viable[0][0][-1]
+            return self.emitted
+        return Observation(t_s=t, frame=frame, state="missing", reason="unconfirmed_temporal_track")
 
 
 def interpolate(points: list[Observation], max_gap_s: float = 0.10) -> None:
@@ -83,7 +131,7 @@ class Players:
                 metric = self.court.project(foot) if self.court else None
                 if metric:
                     x, y = metric
-                    if not (-3 < x < 11.23 and -5 < y < 28.77):
+                    if not (-1.5 < x < 9.73 and -5 < y < 28.77):
                         continue
                     side = "near" if y >= 23.77 / 2 else "far"
                 else:
@@ -101,9 +149,9 @@ class Players:
                 chosen, foot, metric = min(
                     viable,
                     key=lambda c: (
-                        distance(c[1], previous.xy_px)
+                        distance(c[1], previous.raw_xy_px or previous.xy_px)
                         if previous and previous.xy_px
-                        else -c[0]["score"]
+                        else -c[0]["score"] + (0.12 * abs(c[2][0] - 4.115) if c[2] else 0)
                     ),
                 )
                 # Light exponential smoothing; output remains explicitly estimated.
@@ -122,6 +170,7 @@ class Players:
                         bbox_px=chosen["bbox"],
                         court_m=metric,
                         score=chosen["score"],
+                        reason=chosen.get("source", "person_detector"),
                     )
                 )
             else:
@@ -130,8 +179,15 @@ class Players:
                 )
 
     def _plausible(self, previous: Observation, foot: Point, metric: Point | None, t: float):
-        if metric and previous.court_m:
-            return distance(metric, previous.court_m) <= 12 * (t - previous.t_s) + 0.4
+        # Compare like-for-like detector box footpoints for association. Pose
+        # ankles refine output geometry afterwards and have a different bias.
+        prior_metric = (
+            self.court.project(previous.raw_xy_px)
+            if self.court and previous.raw_xy_px
+            else previous.court_m
+        )
+        if metric and prior_metric:
+            return distance(metric, prior_metric) <= 12 * (t - previous.t_s) + 0.6
         assert previous.xy_px
         return distance(foot, previous.xy_px) <= self.width * (t - previous.t_s) + 20
 

@@ -13,9 +13,14 @@ from PIL import Image
 
 from baseline_lab.analytics.events import candidates
 from baseline_lab.analytics.live import live_metrics
+from baseline_lab.analytics.quality import update_quality
+from baseline_lab.analytics.shots import shot_signals
+from baseline_lab.analytics.speed import research_speed
 from baseline_lab.contracts import (
+    BallSpeedSample,
     Calibration,
     CameraBatch,
+    CameraFrame,
     Correction,
     Event,
     Metadata,
@@ -28,7 +33,10 @@ from baseline_lab.settings import Settings
 from baseline_lab.tracking.association import BallAssociation, Players, summarize
 from baseline_lab.video.camera_recording import CameraRecording
 from baseline_lab.video.stability import CameraStability
+from baseline_lab.vision.ball import BALL_SHA, TemporalBall
 from baseline_lab.vision.detectors import ColorMotionBall, HOGPlayers, SSDPlayers
+from baseline_lab.vision.people import flow_people
+from baseline_lab.vision.pose import POSE_SHA, PoseEstimator, far_player_regions
 
 
 def atomic_json(path: Path, value: dict):
@@ -45,9 +53,20 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
         Calibration.model_validate(payload["calibration"]) if payload.get("calibration") else None
     )
     court = Court(calibration) if calibration else None
+    reference_court = court
+    calibration_frames = []
     players = Players(court, payload["width"], payload["height"])
-    ball_detector = ColorMotionBall()
-    association = BallAssociation(math.hypot(payload["width"], payload["height"]))
+    pose = PoseEstimator(cfg.data_dir / "models") if cfg.player_model == "ssdlite" else None
+    if court and isinstance(detector, SSDPlayers):
+        detector.focus_regions = far_player_regions(court, payload["width"], payload["height"])
+    ball_detector = (
+        TemporalBall(cfg.data_dir / "models")
+        if cfg.player_model == "ssdlite"
+        else ColorMotionBall()
+    )
+    association = BallAssociation(
+        math.hypot(payload["width"], payload["height"]), neural=cfg.player_model == "ssdlite"
+    )
     ball: list[Observation] = []
     timestamps = []
     raw_timestamps = []
@@ -55,6 +74,7 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
     recording = CameraRecording(output / "review.mp4", payload["width"], payload["height"])
     previous = None
     stability = None
+    reference_image = None
     reference = directory / "camera-reference.jpg"
     if reference.exists():
         with Image.open(reference) as header:
@@ -70,7 +90,7 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
     last_capture = -1.0
     started = time.monotonic()
     last_input = started
-    reviewed = []
+    reviewed: list[Event] = []
     consumed = set()
     warnings = [
         "Sparse live batches; missed frames are not measurements",
@@ -78,6 +98,7 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
         "Manual contact depth is approximate; all line calls uncertain",
     ]
     result = None
+    speed_samples: list[BallSpeedSample] = []
     while time.monotonic() - started < 70:
         checkpoint("live_waiting_for_frames", len(ball), None)
         path = directory / "camera-input.json"
@@ -90,11 +111,10 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                 sequence = batch.sequence
                 last_input = stage_start
                 last_image = None
-                for index, captured in enumerate(batch.frames):
-                    if captured.t_s <= last_capture:
+                decoded: list[tuple[CameraFrame, np.ndarray]] = []
+                for captured in batch.frames:
+                    if captured.t_s <= last_capture or len(ball) + len(decoded) >= 1800:
                         continue
-                    if len(ball) >= 1800:
-                        break
                     binary = base64.b64decode(captured.jpeg_base64, validate=True)
                     with Image.open(io.BytesIO(binary)) as header:
                         if header.format != "JPEG" or header.size != (
@@ -105,36 +125,69 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                     image = cv2.imdecode(np.frombuffer(binary, np.uint8), cv2.IMREAD_COLOR)
                     if image is None:
                         raise ValueError("invalid_camera_jpeg")
+                    decoded.append((captured, image))
+                batch_detections = (
+                    ball_detector.detect_batch([image for _, image in decoded])
+                    if isinstance(ball_detector, TemporalBall) and decoded
+                    else None
+                )
+                for index, (captured, image) in enumerate(decoded):
+                    if reference_image is None:
+                        reference_image = image.copy()
                     if stability is None:
                         stability = CameraStability(image)
-                    if index == len(batch.frames) - 1 and court is not None:
-                        drift = stability.drift(image)
-                        if drift is None or drift > 8:
-                            court = None
-                            players.court = None
-                            warnings.append(
-                                "Camera motion invalidated calibration; stop and recalibrate"
-                            )
-                            for points in players.points.values():
-                                for point in points:
-                                    point.court_m = None
+                    details = None
+                    if reference_court:
+                        court = None
+                        mapping = stability.mapping(image)
+                        if mapping is not None and mapping[1] < payload["width"] * 0.15:
+                            transformed = cv2.perspectiveTransform(
+                                np.array([reference_court.corners], np.float32), mapping[0]
+                            )[0]
+                            try:
+                                court = Court(Calibration(corners_px=transformed.tolist()))
+                                details = court.details()
+                                details.update(
+                                    {
+                                        "camera_drift_px": mapping[1],
+                                        "registration_residual_px": mapping[2],
+                                    }
+                                )
+                            except ValueError:
+                                pass
+                        players.court = court
+                    calibration_frames.append(details)
                     if capture_origin is None:
                         capture_origin = captured.t_s
                     sample_t = captured.t_s - capture_origin
                     raw_timestamps.append(sample_t)
                     recording.write(image, sample_t)
-                    detections = ball_detector.detect(image, previous)
+                    detections = (
+                        batch_detections[index]
+                        if batch_detections is not None
+                        else ball_detector.detect(image, previous)
+                    )
                     if court:
-                        polygon = np.asarray(court.corners, np.float32)
+                        top = min(y for _, y in court.corners) - 0.3 * payload["height"]
+                        left = min(x for x, _ in court.corners) - 0.2 * payload["width"]
+                        right = max(x for x, _ in court.corners) + 0.2 * payload["width"]
                         detections = [
                             d
                             for d in detections
-                            if cv2.pointPolygonTest(polygon, d["xy"], True) >= -50
+                            if d["xy"][1] >= top and left <= d["xy"][0] <= right
                         ]
                     ball.append(association.update(detections, sample_t, len(ball)))
-                    # Full person inference is one frame per burst, explicitly missing elsewhere.
-                    people = detector.detect(image) if index == len(batch.frames) - 1 else []
+                    people: list[dict] = []
+                    if previous is not None and captured.t_s - last_capture <= 0.1:
+                        people = flow_people(
+                            previous, image, [v[-1] for v in players.points.values()]
+                        )
+                    if index in (0, len(decoded) - 1) or len(people) < 2:
+                        people = detector.detect(image)
                     players.update(people, sample_t, len(ball) - 1)
+                    if pose and people:
+                        for identity, observations in players.points.items():
+                            pose.estimate(image, observations[-1], court, identity=identity)
                     timestamps.append(sample_t)
                     last_capture = captured.t_s
                     previous = image
@@ -144,9 +197,18 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                         if contact.name in consumed:
                             continue
                         body = Correction.model_validate_json(contact.read_text())
+                        contact_frame = min(
+                            range(len(timestamps)), key=lambda i: abs(timestamps[i] - body.t_s)
+                        )
+                        contact_calibration = calibration_frames[contact_frame]
+                        contact_court = (
+                            Court(Calibration(corners_px=contact_calibration["corners_px"]))
+                            if contact_calibration
+                            else None
+                        )
                         position = (
-                            court.project(body.xy_px)
-                            if court and body.status != "rejected"
+                            contact_court.project(body.xy_px)
+                            if contact_court and body.status != "rejected"
                             else None
                         )
                         reviewed.append(
@@ -164,6 +226,7 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                                 if position
                                 else None,
                                 notes=body.notes,
+                                shot_evidence=body.shot_evidence,
                             )
                         )
                         consumed.add(contact.name)
@@ -188,20 +251,33 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                         metadata=meta,
                         tracks=tracks,
                         events=candidates(ball, list(players.points.values())) + reviewed,
-                        calibration=court.details() if court else None,
+                        calibration=reference_court.details() if reference_court else None,
+                        frame_calibrations=calibration_frames,
                         warnings=warnings,
                         elapsed_s=time.monotonic() - started,
                         provenance={
                             "source": "local_camera",
+                            "pose_sha256": POSE_SHA if pose else None,
+                            "ball_weights_sha256": BALL_SHA
+                            if cfg.player_model == "ssdlite"
+                            else None,
                             "timestamps": "browser performance clock relative to capture start",
                             "sampling": (
                                 "up to 8 sequential frames per latest-only burst; "
-                                "one person inference per burst"
+                                "person detections with checked optical flow between"
                             ),
                             "device": "cpu",
                         },
                     )
+                    update_quality(result)
                     result.live_metrics = live_metrics(result)
+                    result.shots = shot_signals(result)
+                    result.ball_speed_estimates, result.speed_analysis = research_speed(
+                        result, reference_image, True, offline=False
+                    )
+                    for i, sample in enumerate(speed_samples):
+                        result.ball_speed_estimates[i] = sample
+                    speed_samples = result.ball_speed_estimates
                     # Sparse person observations require a clearly labeled inter-burst estimate.
                     speeds = {}
                     for identity in ["near", "far"]:
@@ -233,6 +309,8 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                             "capture_t_s": last_capture,
                             "processing_ms": round((time.monotonic() - stage_start) * 1000),
                             "metrics": result.live_metrics[-1].model_dump(),
+                            "shots": [s.model_dump() for s in result.shots[-5:]],
+                            "ball_speed": result.ball_speed_estimates[-1].model_dump(),
                             "player_speed_m_s": speeds,
                             "tracks": [
                                 {"id": t.id, "observation": t.observations[-1].model_dump()}
@@ -240,9 +318,14 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                             ],
                             "events": [e.model_dump() for e in result.events[-20:]],
                             "calibration_valid": court is not None,
+                            "calibration": calibration_frames[-1],
+                            "ball_trail": [
+                                p.model_dump() for p in ball[-120:] if ball[-1].t_s - p.t_s <= 2
+                            ],
                             "warnings": list(dict.fromkeys(warnings)),
                         },
                     )
+                    last_input = time.monotonic()
                     checkpoint("live_processing", len(ball), None)
         if (directory / "camera-stop").exists() or len(ball) >= 1800:
             break

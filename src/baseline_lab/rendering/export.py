@@ -8,11 +8,129 @@ import av
 import cv2
 import numpy as np
 
-from baseline_lab.contracts import Result
+from baseline_lab.contracts import BallSpeedSample, Result
 from baseline_lab.video.media import frames
+from baseline_lab.vision.pose import draw_pose
 
 
 def csvs(result: Result, directory: Path) -> None:
+    with (directory / "ball-speed.csv").open("w", newline="") as speeds:
+        writer = csv.writer(speeds)
+        fields = list(BallSpeedSample.model_fields)
+        writer.writerow(fields)
+        writer.writerows(
+            [sample.model_dump()[key] for key in fields] for sample in result.ball_speed_estimates
+        )
+    with (directory / "shots.csv").open("w", newline="") as shots:
+        writer = csv.writer(shots)
+        writer.writerow(
+            [
+                "id",
+                "time_s",
+                "frame",
+                "player",
+                "reviewed_or_unknown_type",
+                "image_speed_px_s",
+                "status",
+                "method",
+            ]
+        )
+        for shot in result.shots:
+            writer.writerow(
+                [
+                    shot.id,
+                    shot.t_s,
+                    shot.frame,
+                    shot.player,
+                    shot.kind,
+                    shot.image_speed_px_s,
+                    shot.status,
+                    shot.method,
+                ]
+            )
+    with (directory / "keypoints.csv").open("w", newline="") as poses:
+        writer = csv.writer(poses)
+        writer.writerow(
+            [
+                "player",
+                "frame",
+                "time_s",
+                "joint",
+                "state",
+                "x_px",
+                "y_px",
+                "visibility",
+                "presence",
+                "pose_score",
+                "footpoint_source",
+                "joint_score",
+                "joint_score_semantics",
+            ]
+        )
+        for track in result.tracks:
+            for observation in track.observations:
+                for point in observation.keypoints:
+                    writer.writerow(
+                        [
+                            track.id,
+                            observation.frame,
+                            observation.t_s,
+                            point.name,
+                            point.state,
+                            *(point.xy_px or (None, None)),
+                            point.visibility,
+                            point.presence,
+                            observation.pose_score,
+                            observation.footpoint_source,
+                            point.score,
+                            point.score_semantics,
+                        ]
+                    )
+    with (directory / "shot-quality.csv").open("w", newline="") as shots:
+        writer = csv.writer(shots)
+        writer.writerow(
+            [
+                "event_id",
+                "time_s",
+                "quality_0_10",
+                "status",
+                "available_factors",
+                "weighted_evidence",
+                "factor",
+                "value",
+                "unit",
+                "factor_score_0_10",
+                "weight",
+                "source",
+                "error_attribution",
+            ]
+        )
+        for event in result.events:
+            quality = event.shot_quality
+            if quality:
+                for name, factor in quality.factors.items():
+                    source = (
+                        "'" + factor.source
+                        if factor.source[:1] in ("=", "+", "-", "@")
+                        else factor.source
+                    )
+                    writer.writerow(
+                        [
+                            event.id,
+                            event.t_s,
+                            quality.score,
+                            quality.status,
+                            quality.available_factors,
+                            quality.evidence_coverage,
+                            name,
+                            factor.value,
+                            factor.unit,
+                            factor.score,
+                            factor.weight,
+                            source,
+                            quality.error_attribution,
+                        ]
+                    )
     with (directory / "live-metrics.csv").open("w", newline="") as live:
         writer = csv.writer(live)
         fields = list(result.live_metrics[0].model_dump()) if result.live_metrics else []
@@ -98,12 +216,32 @@ def annotated(source: Path, target: Path, result: Result, checkpoint) -> None:
         stream.codec_context.time_base = Fraction(1, 90000)
         stream.options = {"crf": "23", "preset": "fast", "threads": "2"}
         for i, (t, _, _, _, image) in enumerate(frames(source)):
+            if image.shape[1::-1] != (meta.width, meta.height):
+                image = cv2.resize(image, (meta.width, meta.height), interpolation=cv2.INTER_AREA)
             checkpoint("rendering", i, meta.frames)
-            if result.calibration:
-                pts = np.array(result.calibration["corners_px"], np.int32)
+            calibration = (
+                result.frame_calibrations[i] if result.frame_calibrations else result.calibration
+            )
+            if calibration:
+                pts = np.array(calibration["corners_px"], np.int32)
                 cv2.polylines(image, [pts], True, (210, 230, 225), 1, cv2.LINE_AA)
             for track in result.tracks:
+                if track.id == "ball":
+                    tail = track.observations[max(0, i - 120) : i + 1]
+                    for a, b in zip(tail, tail[1:], strict=False):
+                        if a.xy_px and b.xy_px and t - b.t_s <= 2 and b.t_s - a.t_s <= 0.1:
+                            start, end = (
+                                tuple(round(v) for v in a.xy_px),
+                                tuple(round(v) for v in b.xy_px),
+                            )
+                            color = (
+                                (235, 243, 94)
+                                if a.state == b.state == "detected"
+                                else (140, 155, 135)
+                            )
+                            cv2.line(image, start, end, color, 3, cv2.LINE_AA)
                 point = track.observations[i]
+                draw_pose(image, point)
                 if point.xy_px:
                     x, y = (int(v) for v in point.xy_px)
                     if track.id == "ball":
@@ -130,15 +268,15 @@ def annotated(source: Path, target: Path, result: Result, checkpoint) -> None:
                 1,
                 cv2.LINE_AA,
             )
-            if result.live_metrics:
-                measurement = result.live_metrics[i]
-                if measurement.ball_image_speed_px_s is not None:
+            if result.ball_speed_estimates:
+                speed = result.ball_speed_estimates[i]
+                if speed.estimated_kmh is not None:
                     cv2.putText(
                         image,
-                        f"BALL IMAGE {measurement.ball_image_speed_px_s:.0f} px/s",
+                        f"BALL ~{speed.estimated_kmh:.0f} km/h | experimental fit",
                         (15, meta.height - 22),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.45,
+                        0.5,
                         (245, 240, 230),
                         1,
                         cv2.LINE_AA,

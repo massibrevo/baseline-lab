@@ -32,6 +32,7 @@ packages = ["src/baseline_lab"]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["src/baseline_lab/vision/vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -60,3 +61,8 @@ explicit = true
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+
+[[tool.mypy.overrides]]
+module = "baseline_lab.vision.vendor.*"
+ignore_errors = true

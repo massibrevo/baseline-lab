@@ -24,7 +24,12 @@ def ts(s):
     if t == "object":
         if "properties" in s:
             return "{" + "; ".join(k + ": " + ts(v) for k, v in s["properties"].items()) + "}"
-        return "Record<string, any>"
+        value = s.get("additionalProperties")
+        return (
+            "Record<string, " + ts(value) + ">"
+            if isinstance(value, dict)
+            else "Record<string, any>"
+        )
     return {
         "string": "string",
         "number": "number",

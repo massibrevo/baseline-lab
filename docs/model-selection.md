@@ -1,3 +1,7 @@
+# Current selection update
+
+The research profile now selects **RTMPose-m** for 17-joint pose and **WASB HRNet tennis** for temporal ball heatmaps. Both use pinned, checksum-checked local checkpoints; see MODEL_MANIFEST.yaml, pose.md and the current verification report. The WASB architecture was inspected and vendored under its MIT license; unused checkpoint-loading entrypoints were removed, and weights load with weights_only=True. Earlier evaluation concerns below are retained as history, not the current selected-model list. No blanket training-data rights or app-accuracy claim follows from these selections.
+
 # Model selection and provenance
 
 Research checked 2026-10-31. Selection prioritizes a reproducible local CPU path, transparent failures, and separable licenses. Source inspection and downloads are distinguished from model-quality evaluation; executed evaluation belongs in the verification report.
@@ -38,7 +42,7 @@ OpenCV 4.5+ is [Apache-2.0](https://opencv.org/license/); the [HOG implementatio
 
 [Hub model](https://huggingface.co/Davidsv/CourtSide-Computer-Vision-v1), inspected revision [`2c66f41b89ec4614f652f52c1c9593d0c00a5fad`](https://huggingface.co/Davidsv/CourtSide-Computer-Vision-v1/tree/2c66f41b89ec4614f652f52c1c9593d0c00a5fad).
 
-The tree contains `.gitattributes`, `README.md`, `config.txt`, `example.py`, `example_detection.png`, `model.pt`, and `requirements.txt`. `model.pt` is 5,488,986 bytes; the Hub tree's LFS SHA256 is `be98152dc5ddcf5552d2b71ae6480d2c6bcf360a1f2369e21b4dc66da442dfcb`. That digest is server metadata, not a locally executed checkpoint verification. The example constructs `ultralytics.YOLO("model.pt")`; requirements are broad lower bounds, not a reproducible lockfile. [Pinned files](https://huggingface.co/Davidsv/CourtSide-Computer-Vision-v1/tree/2c66f41b89ec4614f652f52c1c9593d0c00a5fad).
+The tree contains `.gitattributes`, `README.md`, `config.txt`, `example.py`, `example_detection.png`, `model.pt`, and `requirements.txt`. `model.pt` is 5,488,986 bytes; the Hub tree's LFS SHA256 is `be98152dc5ddcf5552d2b71ae6480d2c6bcf360a1f2369e21b4dc66da442dfcb`. That digest was subsequently verified locally for the isolated trial. The example constructs `ultralytics.YOLO("model.pt")`; requirements are broad lower bounds, not a reproducible lockfile. [Pinned files](https://huggingface.co/Davidsv/CourtSide-Computer-Vision-v1/tree/2c66f41b89ec4614f652f52c1c9593d0c00a5fad).
 
 The [card](https://huggingface.co/Davidsv/CourtSide-Computer-Vision-v1/blob/2c66f41b89ec4614f652f52c1c9593d0c00a5fad/README.md) states YOLOv11n, 640×640 input, and these classes:
 
@@ -57,7 +61,7 @@ The [card](https://huggingface.co/Davidsv/CourtSide-Computer-Vision-v1/blob/2c66
 
 These are the published card classes; the checkpoint class map was not loaded and independently checked. There is no person class. Zone boxes do not provide court-line intersections. The card names Roboflow ball/racket/court datasets, but does not establish held-out performance on this application's private-camera domain. Its reported metrics are author claims, not Baseline Lab measurements.
 
-The card declares MIT; the inspected file tree contains no standalone license text. The [Ultralytics source license](https://github.com/ultralytics/ultralytics/blob/main/LICENSE) is AGPL-3.0, with separately offered enterprise terms. The card's metadata does not override the dependency's terms or settle training-data and base-weight rights. Baseline Lab does not install Ultralytics, download this checkpoint, or claim those issues are resolved.
+The card declares MIT; the inspected file tree contains no standalone license text. The [Ultralytics source license](https://github.com/ultralytics/ultralytics/blob/main/LICENSE) is AGPL-3.0, with separately offered enterprise terms. The card's metadata does not override the dependency's terms or settle training-data and base-weight rights. A free isolated local trial has now downloaded and safely evaluated this checkpoint; it is not an app dependency. See [executed comparison](courtside-trial.md). The trial did not establish a ball-tracking improvement.
 
 The Hub metadata API returned `inferenceProviderMapping: {}` on the research date. This supplies no evidence of a supported Inference Providers endpoint; no real hosted request was executed. A model listing and example Python script are not an unlimited free API.
 
@@ -74,3 +78,10 @@ The Hub metadata API returned `inferenceProviderMapping: {}` on the research dat
 3. **Docker Space:** deploy the complete Python application on a container host, with explicit authentication, owner checks, persistence, resource limits, and restricted CORS. This is application hosting, not a property of a Hub model listing.
 
 No candidate research above enables billing, paid API calls, or automatic provider fallback. Hosted demo playback must remain distinct from a verified hosted private-processing service.
+
+
+## Temporal stroke-classifier investigation
+
+A released MIT LRCNN candidate from [Chow and Dibua](https://github.com/chow-vincent/tennis_action_recognition/tree/e8f910a7340b5828293dfebd978d2d3aafac120b) was inspected and trialed in an isolated work runtime. Its public checkpoint SHA256 is `cf6c9946fa1f0e5f3c3c7f2a8d5cb8485f95e502aed943f83b29ed0e1f8688b7`; numeric HDF5 arrays were read directly, without executing its serialized Lambda. The trial matched original 480×640 ImageNet Inception pooled features, six-class order, 16-frame sequence and legacy hard-sigmoid LSTM gates. It was not selected: the trial did not establish reliable transfer to this application's footage. No private frames, labels, result arrays or trial artifacts are published. Its dependencies/weights are not added to the app.
+
+The released [VideoMAE tennis checkpoint](https://huggingface.co/vishnushenoy09/videomae-tennis-shottype) distinguishes topspin/slice/volley/flat/smash, not forehand/backhand. The [NVIDIA tennis reasoning model](https://huggingface.co/nvidia/NVIDIA-NemotronLabs-AI-for-Media-Sports-Tennis) specifies 31B parameters and an 80 GB GPU for BF16, beyond this local target. Neither is treated as a drop-in solution or silently enabled through paid/cloud processing. Reliable automatic stroke labeling remains an open model/data validation requirement.

@@ -1,4 +1,4 @@
-schema_version: '1.0'
+schema_version: '1.2'
 player:
   adapter: SSDPlayers
   architecture: ssdlite320_mobilenet_v3_large
@@ -9,14 +9,20 @@ player:
   size_bytes: 14069355
   serialization: pytorch state_dict; torch.load(weights_only=True); no remote code
   code_license: BSD-3-Clause (torchvision); BSD-style (PyTorch)
-  weight_license: No separate permissive weights grant asserted; review official pretrained-model and COCO terms
+  weight_license: No separate permissive weights grant asserted; review official pretrained-model
+    and COCO terms
   training_data: COCO train2017; underlying image rights vary
-  class_mapping: {1: person}
-  preprocess: RGB float32 [0,1]; torchvision internal 320x320 normalization; overlapping 60%-image tiles above width 960; output boxes offset to display pixels; cross-tile NMS IoU 0.4
+  class_mapping:
+    1: person
+  preprocess: RGB float32; overlapping scene/far-baseline tiles; discard tile-truncated
+    bodies; invert crop offsets; refresh every third frame when checked optical flow
+    succeeds
   confidence_threshold: 0.35
-  device: cpu; 2 torch threads
+  device: automatic MPS when available; CPU fallback; 2 torch threads
   downloads: explicit setup-models only; cached offline thereafter
   redistribution: not included in Git or Sites; separately fetched by user
+  association: court-region and center prior, raw box-footpoint temporal gate; pose
+    ankle output kept separate; near/far identities are positions, not recognition
 fallback:
   adapter: HOGPlayers
   model: OpenCV built-in default people HOG+SVM
@@ -24,24 +30,58 @@ fallback:
   license: Apache-2.0 distribution; upstream notices apply
   performance: not validated for distant tennis athletes
 ball:
-  adapter: ColorMotionBall
-  revision: color-motion-v1
-  weights: none
-  license: MIT (original implementation)
-  preprocess: original display BGR pixels; HSV yellow/white AND positive frame difference; initial static-white exclusion; circularity/local contrast; detected-person exclusion
-  score_semantics: heuristic circularity/local-contrast score, not probability
-  association: prediction gate; 200ms reacquisition; interpolation at most 3 frames and 100ms
-  limitations: white clothing, lines, spectators, blur, occlusion, tiny balls, lighting
+  adapter: TemporalBall
+  architecture: WASB HRNet tennis, 3 causal frames, latest output channel
+  revision: 923462cacdeb3353b84ddebdedb3f4b7a8553b0f
+  upstream: https://github.com/nttcom/WASB-SBDT
+  checkpoint: https://drive.google.com/file/d/14AeyIOCQ2UaQmbZLNQJa1H_eSwxUXk7z/view
+  filename: wasb-tennis.pth.tar
+  sha256: 9d391239ab10c733f8e5bfadf16ab72838e7a8ebc88e8ae2038501c03d42b4bb
+  size_bytes: 6102633
+  serialization: torch.load(weights_only=True), model_state_dict, exact vendored architecture;
+    no remote code
+  preprocess: 512x288 affine current/past RGB, ImageNet mean/std; concatenate channels;
+    sigmoid heatmap, connected components at .5; inverse affine weighted centroids
+  device: Apple MPS when available, otherwise CPU; actual device recorded per run
+  code_license: MIT NTT/Microsoft attribution in vendor file and licenses/wasb-MIT.txt
+  weights_license: official author-distributed research checkpoint; no additional
+    blanket grant over training-video rights asserted; not redistributed
+  association: bounded multi-hypothesis tracklets, confirmed motion, jump guard; at
+    most 3 frames/100ms interpolation
+  fallback: original ColorMotionBall v2 only for offline HOG fixture profile
+  limitations: tiny/occluded balls, multiple practice balls, overlays and new domains
+    still require evaluation; model benchmark is not app accuracy
 court:
-  method: manual four labeled singles outside-painted corners; validated geometry math only
+  method: manual four labeled singles outside-painted corners; validated geometry
+    math only
   automatic_calibration: unavailable; no court keypoint weights selected
   accuracy: manual uncertainty not independently measured; all line calls remain uncertain
+  motion: verified ORB/RANSAC reference-to-current homographies per frame; spread/inliers/residual/drift
+    checks; null ground geometry on failed frames; cuts fail
 not_selected:
   CourtSide:
     revision: 2c66f41b89ec4614f652f52c1c9593d0c00a5fad
     actual_filename: model.pt
     sha256: be98152dc5ddcf5552d2b71ae6480d2c6bcf360a1f2369e21b4dc66da442dfcb
-    reason: no person or court keypoint classes; Ultralytics AGPL/enterprise and weight licensing unresolved
+    reason: no person or court keypoint classes; Ultralytics AGPL/enterprise and weight
+      licensing unresolved
     inference_providers_observed: []
-  WASB:
-    reason: temporal model worth evaluating; separate checkpoint/data rights not verified
+pose:
+  adapter: PoseEstimator
+  architecture: RTMPose-m Body7 / SimCC COCO17
+  revision: cd4d7095f5cfc9cfc4f46289bee91ea4a1e1d9fd (Tau-J maintainer mirror)
+  filename: rtmpose-m-body7.onnx
+  sha256: 5c0a4bf67953e6d2ac43ce15e77dc9d5d354ae18430a47d2c5963a7bc5683e3c
+  size_bytes: 54330655
+  archive_sha256: f7fbb6c5c11a1bb70f3d445e4ddec5d144ea89ad5649c081ef976f9b24a0b741
+  upstream: https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose
+  mirror: https://huggingface.co/Tau-J/RTMPose
+  serialization: ONNX, OpenCV DNN CPU, no downloaded runtime code
+  preprocess: 1.25 padded 192x256 aspect-preserving person crop; BGR mean [123.675,116.28,103.53]
+    std [58.395,57.12,57.375]; NCHW; 2x SimCC; inverse crop transform
+  score: mean x/y response; joint threshold .30; not calibrated probability
+  license: upstream MMPose code Apache-2.0; pretrained checkpoint and Body7 dataset
+    terms separate; no blanket training-data license asserted
+  redistribution: checkpoint not included; explicit setup-models fetch only
+  measurements: 17 image joints and 2D knee angles; no measured 3D anatomy; ankle
+    ground point approximate

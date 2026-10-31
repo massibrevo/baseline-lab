@@ -140,6 +140,11 @@ def test_real_tennis_camera_transport(config):
     target = config.data_dir / "models"
     target.mkdir(parents=True)
     os.link(settings().data_dir / "models" / MODEL_FILE, target / MODEL_FILE)
+    from baseline_lab.vision.ball import BALL_FILE
+    from baseline_lab.vision.pose import POSE_FILE
+
+    os.link(settings().data_dir / "models" / POSE_FILE, target / POSE_FILE)
+    os.link(settings().data_dir / "models" / BALL_FILE, target / BALL_FILE)
     test_camera_bursts_ownership_review_recording_and_stop(
         config, Path("examples/commons-stabilized.mp4")
     )

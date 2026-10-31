@@ -502,6 +502,131 @@
         }
       }
     },
+    "/api/v1/sessions/{sid}/jobs/{jid}/shots": {
+      "post": {
+        "summary": "Annotate Stroke",
+        "operationId": "annotate_stroke_api_v1_sessions__sid__jobs__jid__shots_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          },
+          {
+            "name": "jid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrokeAnnotation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/jobs/{jid}/shots/{shot_id}": {
+      "patch": {
+        "summary": "Review Shot",
+        "operationId": "review_shot_api_v1_sessions__sid__jobs__jid__shots__shot_id__patch",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          },
+          {
+            "name": "jid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jid"
+            }
+          },
+          {
+            "name": "shot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Shot Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShotReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{sid}/jobs/{jid}/events/{eid}": {
       "patch": {
         "summary": "Correct",
@@ -867,6 +992,110 @@
   },
   "components": {
     "schemas": {
+      "BallSpeedSample": {
+        "properties": {
+          "t_s": {
+            "type": "number",
+            "title": "T S"
+          },
+          "frame": {
+            "type": "integer",
+            "title": "Frame"
+          },
+          "estimated_kmh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Kmh"
+          },
+          "low_kmh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Kmh"
+          },
+          "high_kmh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Kmh"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "experimental",
+              "unavailable"
+            ],
+            "title": "Status",
+            "default": "unavailable"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "support_start_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support Start S"
+          },
+          "support_end_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support End S"
+          },
+          "reprojection_rms_px": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reprojection Rms Px"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t_s",
+          "frame"
+        ],
+        "title": "BallSpeedSample"
+      },
       "Body_upload_api_v1_sessions_post": {
         "properties": {
           "file": {
@@ -991,6 +1220,16 @@
             "maxLength": 1000,
             "title": "Notes",
             "default": ""
+          },
+          "shot_evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShotEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1098,6 +1337,37 @@
             ],
             "title": "Shot Depth M"
           },
+          "shot_width_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Width M"
+          },
+          "shot_evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShotEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shot_quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShotQuality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "depth_semantics": {
             "type": "string",
             "title": "Depth Semantics",
@@ -1142,6 +1412,110 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "Keypoint": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "raw_xy_px": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Xy Px"
+          },
+          "xy_px": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xy Px"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "detected",
+              "missing"
+            ],
+            "title": "State"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          },
+          "presence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presence"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "score_semantics": {
+            "type": "string",
+            "title": "Score Semantics",
+            "default": "model visibility/presence scores; not calibrated probability"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "state",
+          "visibility",
+          "presence"
+        ],
+        "title": "Keypoint"
       },
       "LiveMetrics": {
         "properties": {
@@ -1226,6 +1600,60 @@
           "contact_candidates_so_far": {
             "type": "integer",
             "title": "Contact Candidates So Far"
+          },
+          "near_visible_joints": {
+            "type": "integer",
+            "title": "Near Visible Joints",
+            "default": 0
+          },
+          "far_visible_joints": {
+            "type": "integer",
+            "title": "Far Visible Joints",
+            "default": 0
+          },
+          "near_left_knee_angle_deg_2d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Near Left Knee Angle Deg 2D"
+          },
+          "near_right_knee_angle_deg_2d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Near Right Knee Angle Deg 2D"
+          },
+          "far_left_knee_angle_deg_2d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Far Left Knee Angle Deg 2D"
+          },
+          "far_right_knee_angle_deg_2d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Far Right Knee Angle Deg 2D"
           }
         },
         "type": "object",
@@ -1347,6 +1775,33 @@
             "type": "string",
             "title": "Time Base"
           },
+          "source_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Width"
+          },
+          "source_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Height"
+          },
+          "analysis_scale": {
+            "type": "number",
+            "title": "Analysis Scale",
+            "default": 1.0
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -1434,6 +1889,17 @@
             ],
             "title": "Raw Xy Px"
           },
+          "apparent_diameter_px": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apparent Diameter Px"
+          },
           "bbox_px": {
             "anyOf": [
               {
@@ -1460,6 +1926,42 @@
               }
             ],
             "title": "Bbox Px"
+          },
+          "keypoints": {
+            "items": {
+              "$ref": "#/components/schemas/Keypoint"
+            },
+            "type": "array",
+            "title": "Keypoints",
+            "default": []
+          },
+          "pose_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pose Score"
+          },
+          "pose_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pose Reason",
+            "default": "pose_not_run"
+          },
+          "footpoint_source": {
+            "type": "string",
+            "title": "Footpoint Source",
+            "default": "bbox_bottom_approximate"
           },
           "court_m": {
             "anyOf": [
@@ -1513,16 +2015,63 @@
         ],
         "title": "Observation"
       },
+      "QualityFactor": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unit",
+          "weight",
+          "source"
+        ],
+        "title": "QualityFactor"
+      },
       "Result": {
         "properties": {
           "schema_version": {
             "type": "string",
             "enum": [
               "1.0",
-              "1.1"
+              "1.1",
+              "1.2",
+              "1.3"
             ],
             "title": "Schema Version",
-            "default": "1.1"
+            "default": "1.3"
           },
           "metadata": {
             "$ref": "#/components/schemas/Metadata"
@@ -1553,6 +2102,22 @@
             ],
             "title": "Calibration"
           },
+          "frame_calibrations": {
+            "items": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Frame Calibrations",
+            "default": []
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -1572,6 +2137,28 @@
             "type": "array",
             "title": "Live Metrics",
             "default": []
+          },
+          "shots": {
+            "items": {
+              "$ref": "#/components/schemas/ShotSignal"
+            },
+            "type": "array",
+            "title": "Shots",
+            "default": []
+          },
+          "ball_speed_estimates": {
+            "items": {
+              "$ref": "#/components/schemas/BallSpeedSample"
+            },
+            "type": "array",
+            "title": "Ball Speed Estimates",
+            "default": []
+          },
+          "speed_analysis": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Speed Analysis",
+            "default": {}
           },
           "ball_speed_m_s": {
             "anyOf": [
@@ -1606,6 +2193,275 @@
         ],
         "title": "Result"
       },
+      "ShotEvidence": {
+        "properties": {
+          "speed_kmh": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 300.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Kmh"
+          },
+          "spin_rpm": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spin Rpm"
+          },
+          "bounce_angle_deg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bounce Angle Deg"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "ShotEvidence"
+      },
+      "ShotQuality": {
+        "properties": {
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "available_factors": {
+            "type": "integer",
+            "title": "Available Factors"
+          },
+          "total_factors": {
+            "type": "integer",
+            "title": "Total Factors",
+            "default": 5
+          },
+          "evidence_coverage": {
+            "type": "number",
+            "title": "Evidence Coverage"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unavailable",
+              "partial",
+              "complete"
+            ],
+            "title": "Status"
+          },
+          "factors": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/QualityFactor"
+            },
+            "type": "object",
+            "title": "Factors"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "groundstroke-pressure-v1; experimental weighted heuristic, not validated skill rating"
+          },
+          "error_attribution": {
+            "type": "string",
+            "const": "undetermined",
+            "title": "Error Attribution",
+            "default": "undetermined"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available_factors",
+          "evidence_coverage",
+          "status",
+          "factors"
+        ],
+        "title": "ShotQuality"
+      },
+      "ShotReview": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "forehand",
+              "backhand",
+              "forehand_volley",
+              "backhand_volley",
+              "serve",
+              "overhead",
+              "unknown"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ShotReview"
+      },
+      "ShotSignal": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "t_s": {
+            "type": "number",
+            "title": "T S"
+          },
+          "frame": {
+            "type": "integer",
+            "title": "Frame"
+          },
+          "player": {
+            "type": "string",
+            "enum": [
+              "near",
+              "far"
+            ],
+            "title": "Player"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "forehand",
+              "backhand",
+              "forehand_volley",
+              "backhand_volley",
+              "serve",
+              "overhead",
+              "unknown"
+            ],
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "estimated",
+              "reviewed"
+            ],
+            "title": "Status",
+            "default": "estimated"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "ball/wrist proximity candidate; stroke type unclassified pending review"
+          },
+          "evidence_score": {
+            "type": "number",
+            "title": "Evidence Score"
+          },
+          "score_semantics": {
+            "type": "string",
+            "title": "Score Semantics",
+            "default": "heuristic evidence, not probability"
+          },
+          "image_speed_px_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Speed Px S"
+          },
+          "original_prediction": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Prediction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "t_s",
+          "frame",
+          "player",
+          "kind",
+          "evidence_score"
+        ],
+        "title": "ShotSignal"
+      },
+      "StrokeAnnotation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "forehand",
+              "backhand",
+              "forehand_volley",
+              "backhand_volley",
+              "serve",
+              "overhead",
+              "unknown"
+            ],
+            "title": "Kind"
+          },
+          "t_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "T S"
+          },
+          "player": {
+            "type": "string",
+            "enum": [
+              "near",
+              "far"
+            ],
+            "title": "Player"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "t_s",
+          "player"
+        ],
+        "title": "StrokeAnnotation"
+      },
       "Submission": {
         "properties": {
           "calibration": {
@@ -1617,6 +2473,11 @@
                 "type": "null"
               }
             ]
+          },
+          "real_time_playback": {
+            "type": "boolean",
+            "title": "Real Time Playback",
+            "default": false
           },
           "preset": {
             "type": "string",

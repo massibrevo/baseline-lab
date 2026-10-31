@@ -59,7 +59,7 @@ def test_gap_is_bounded_and_missing_not_zero():
 
 def test_impossible_ball_link_rejected():
     tracker = BallAssociation(1000)
-    assert tracker.update([{"xy": (20, 20), "score": 0.8}], 0, 0).state == "detected"
+    assert tracker.update([{"xy": (20, 20), "score": 0.8}], 0, 0).state == "missing"
     p = tracker.update([{"xy": (950, 950), "score": 0.9}], 0.03, 1)
     assert p.state == "missing"
 
@@ -94,3 +94,40 @@ def test_camera_motion_detected():
     stability = CameraStability(im)
     assert stability.drift(im) < 0.01
     assert stability.drift(np.roll(im, 20, axis=1)) > 15
+
+
+def test_ball_temporal_evidence_rejects_stationary_clutter_and_expires():
+    tracker = BallAssociation(1000)
+    positions = []
+    for i in range(10):
+        p = tracker.update(
+            [{"xy": (50, 50), "score": 0.99}, {"xy": (200 + 12 * i, 200 + 4 * i), "score": 0.85}],
+            i / 30,
+            i,
+        )
+        positions.append(p)
+    assert all(
+        p.xy_px == (200 + 12 * i, 200 + 4 * i)
+        for i, p in enumerate(positions)
+        if p.state == "detected"
+    )
+    assert positions[-1].state == "detected"
+    assert tracker.update([{"xy": (400, 300), "score": 0.9}], 2, 60).state == "missing"
+
+
+def test_verified_camera_mapping_keeps_ground_coordinates_in_current_frame(court):
+    import cv2
+
+    rng = np.random.default_rng(12)
+    image = rng.integers(0, 256, (480, 640, 3), dtype=np.uint8)
+    moved = cv2.warpAffine(image, np.array([[1, 0, 16], [0, 1, 7]], np.float32), (640, 480))
+    mapping = CameraStability(image).mapping(moved)
+    assert mapping is not None
+    transform, drift, residual = mapping
+    assert drift > 10 and residual < 2
+    corners = cv2.perspectiveTransform(np.array([court.corners], np.float32), transform)[0]
+    current = Court(Calibration(corners_px=corners.tolist()))
+    expected = (3.0, 18.0)
+    point = np.array([[court.image(expected)]], np.float32)
+    shifted_point = cv2.perspectiveTransform(point, transform)[0, 0]
+    assert current.project(tuple(shifted_point)) == pytest.approx(expected, abs=0.01)

@@ -1,72 +1,33 @@
 # Executed verification — 31 October 2026
 
-This is a working experimental local vertical slice and hosted-example frontend, not a completed broad real-world accuracy validation. Statuses below distinguish execution from configuration. The exact reproducible commands are in README.md.
+This is an experimental local analysis app and a precomputed hosted example. It has not passed independent broad tennis-perception or physical-speed validation.
 
-## Local checks
+## Current checks
 
-| Check | Status and evidence |
-|---|---|
-| Locked Python environment and frontend dependencies | Executed; uv.lock and package-lock.json; Python 3.12.14, Node 22.12.0 |
-| Ruff lint / formatter | Passed on src, scripts and tests |
-| mypy | Passed across 20 source modules |
-| Pydantic-generated frontend types / production TypeScript build | Passed |
-| pytest | **27 passed**, including the explicit real-checkpoint/real-image model test; one Starlette/httpx deprecation warning |
-| Geometry | Known correspondences, inverse, degenerate/order rejection, letterbox offsets, uncertainty around lines passed |
-| Timestamps | Real-PTS MP4/VFR decode and annotated H.264 roundtrip passed; original integer PTS retained |
-| Rotation | H.264 MOV with a real 90-degree display matrix passed; normalized display dimensions and PTS verified |
-| Association | Bounded gaps, impossible ball link, player side assignment/spectator-region rejection, distance excluding gaps/jumps passed |
-| Durable lifecycle | Actual inference child through upload→submit→worker→result→CSV/MP4→correction→deletion passed; idempotent submissions, atomic claim, restart state recovery, active cancellation and timeout cleanup passed |
-| Private access / invalid media | Two browser capabilities, denied cross-session reads/source/deletion, CSRF, invalid extension/data, worker-unavailable and physical deletion passed |
-| Real model | Official SSDlite COCO_V1 checkpoint downloaded, SHA256 verified, weights_only loaded, real inference passed |
-| Real clip | Entire 12.5 s / 375-frame stabilized attributed singles clip processed, annotated and browser-review H.264 files generated |
-| Docker | Compose configuration validated; container build/run **not executed** because the installed Docker client has no running daemon |
-| Remote private inference | **Not provisioned/not tested**; hosted Site is demo-only, no private HTTPS Python service |
-| Independent human labels / private baseline-camera validation | **Not available**; provisional visual labels are explicitly not an independent human benchmark |
-| Peak memory | **Not measured**; `/usr/bin/time -l` resource details were blocked by an OS sysctl restriction; no estimate substituted |
+- Ruff lint/format, mypy across 29 application modules, Pydantic-generated TypeScript and production frontend build pass.
+- 42 offline unit/integration/end-to-end checks pass. They include an actual isolated child worker, codecs, durable jobs, cancellation/timeouts, ownership/CSRF controls, event and stroke review, VFR/rotation, bounded 4K import, proxy timestamps, camera mapping, association, pose transforms, smoothing, metric gaps, Shot Quality and synthetic flight consistency.
+- Two explicit real-checkpoint checks pass: cached SSD/RTMPose inference and actual API/worker camera transport using licensed tennis frames and WASB. One Starlette/httpx deprecation warning remains.
+- An initial real-camera transport run found an idle-timeout bug: slow first-burst inference counted as time waiting for new input. The idle clock now restarts after processing; the actual model transport test then passed. Physical webcam permission/lens capture remains unverified in the in-app browser.
+- The reported high-resolution MOV uploads through the browser/API, creates a playable bounded analysis copy, completes analysis and reopens by private deep link. Every decoded PTS survives the preview at the 90 kHz encoder/muxer time base. Private footage, geometry, telemetry, identifiers and screenshots stay outside Git/Site artifacts.
+- Actual private playback shows both 17-joint skeletons, a two-second cyan ball trail, km/h research estimates, player speed/path metrics and the adjacent shot/court panel. PTS stepping updates values; unsupported values remain missing. Playback advances with readyState 4, no media error and no console errors. This browser does not expose frame-drop counters; zero dropped frames is not asserted.
+- The UI now has a measurement dock immediately below the video, evidence/freshness badges, direct bounce/stroke review, and an evidence inspector. The unused external-sensor speed card was removed; unsupported values have explicit actions instead of empty dashes. Bounce review no longer silently changes playback to 0.25×. Duplicate frame renders and repeated canvas resizing were removed. Side panels update at a bounded rate. One Euro joint smoothing retains raw coordinates, and robust player-velocity fits use a 0.5 s observed window with bounded temporal smoothing.
 
-The offline suite executes a real child worker and codecs with the built-in HOG fallback; it is not merely a mocked queue/provider test. Separate real-model inference runs after explicit setup. The source uses a known HOG-capable OpenCV version after an executed API-compatibility failure with the initially resolved OpenCV 5 package. Current pins are authoritative.
+## Public example measurement
 
-## Measured perception limits
+Machine: Apple M3 Pro, 12 cores, 18 GB RAM, arm64 macOS 27.2. Native MPS is used for Torch inference when available; OpenCV pose uses two CPU threads. One complete final 375-frame / 12.5-second licensed example run took **99.666 s**, including model initialization, inference and exports. Recorded stages: ball heatmaps 9.444 s; player tracking/pose 77.713 s; annotated export 5.441 s. Stages omit setup/proxy time; their sum is not the whole runtime. These are individual observations, not a latency SLA or real-time guarantee.
 
-Machine: **Apple M3 Pro, 12 cores (6 performance/6 efficiency), 18 GB RAM, arm64 macOS 27.2**. CPU inference uses 2 Torch threads. Full example pipeline: **84.614 s** internal elapsed; **85.66 s** external wall measurement, including process startup. Hardware model and memory were read from filtered system_profiler output, without device identifiers. These timings are one run, not an SLA.
+Full observed coverage ball/near/far: **73.1% / 97.6% / 75.2%**. Coverage is not accuracy. Later provisional visual check: ball **3/4** within 15 px with one missing; near **6/6** within 35 px; far **5/6** with one missing. Observed ball errors **[2.11, 0.15, 1.78] px**. The development labels were seen during iteration, are not independently human-verified, and are not a sealed holdout. See evaluation-provisional.json. No bounce precision, independent court error or radar-speed accuracy result exists.
 
-[Machine-readable provisional evaluation](evaluation-provisional.json): one real source recording, early 3-frame tuning sample and later 6-frame visual-check sample. Only four later ball locations were sufficiently visible for provisional point annotation. These labels were made visually by Codex during implementation, not independently verified by a human. The later segment was observed during development, so this is a smoke study, not a sealed holdout.
+CourtSide was separately tested locally with safe weight loading at 640 and 1280 inputs, on nine public frames. It returned no ball candidates on the seven visible-ball annotations in either run. It was not adopted. See courtside-trial.md; the small negative result does not establish general model quality.
 
-- Later ball localization: **2/4** labeled points within 15 px; one missing and one observed false association (about 74 px error). Observed-point errors `[74.20, 0.50, 0.00]` must be read with that missing point; the median alone would hide the failure.
-- Near player: **6/6** later provisional footpoints within 35 px; median observed error about **9.1 px**. This does not establish tracking identity or metric-distance accuracy.
-- Far player: **1/6** later labeled frames observed/in tolerance; **5/6 missing**. Distant athlete detection is a major limitation.
-- Full-clip observation coverage: ball-like **69.1%**, near **93.9%**, far **13.3%**. Coverage is not localization accuracy; false detections count toward observed coverage.
-- **8 candidate contacts**, all unconfirmed. Bounce timing/location precision is **null**, because no independently labeled bounce set exists. Candidate extrema are not verified bounces.
-- Independent court error, calibrated uncertainty, line-call accuracy, 3D ball speed and spin are **unavailable**. A four-point residual is not an independent court-error estimate. All line calls stay uncertain and 3D speed stays null.
+## Measurement limits
 
-The example is a stabilized oblique elevated camera study. The unstabilized source shows substantial camera drift; using its initial homography through the rally would be wrong. The pipeline invalidates metric geometry for detectable/unverifiable drift, and strong camera cuts fail with a recalibration message. These are conservative heuristics, not full-match shot segmentation. No private-camera or broadcast-general accuracy result is implied.
+Validated `ball_speed_m_s` remains null. Schema 1.3 separates experimental 3D fits, assumptions, unsupported intervals and sensitivity ranges. Normal 1× action timing must be confirmed for uploads. The UI can hold a historical supported-flight value with age, never label it as a new observation. This is not reliable continuous speed-gun output. Spin, independently measured bounce angle and forced/unforced attribution are unavailable. Shot Quality is a transparent partial heuristic until the required independent factors exist.
 
-## Browser checks
+Unreliable pose-side stroke guesses were removed. Proximity candidates remain unknown until human review; corrections preserve original predictions. Reviewers can add a timestamped stroke even when automatic impact detection missed it, and use jump buttons to verify the label. No trained stroke-classification accuracy is asserted. Camera bursts are sampled/latest-only and show their matching analyzed frame and latency, not an old overlay on a newer preview. Failed registration leaves the affected frame without ground geometry. All line calls remain uncertain.
 
-The local app was opened and exercised in the Codex in-app browser. Tested: real public example loading and playback controls, PTS frame stepping, overlay controls, selectable contact review, full metadata upload, four-corner calibration and real worker progress. Desktop and narrow responsive layouts were visually inspected. Screenshot is in `workspace.png`; source-media attribution applies. Additional final browser/publication outcomes are recorded below when completed.
+## Exposure and publication
 
-## Known limits and next verification
+The running API was verified listening only at **127.0.0.1:8000**. A pattern scan of 118 Git-history text blobs and current tracked text found no matching GitHub/HF/OpenAI tokens, AWS access keys, private keys or credential URLs. No private data/runtime directory or .env is tracked. This is a limited check, not a penetration test or guarantee of no vulnerabilities. Dependencies and source remain reviewable. Never expose the local browser-capability API directly to the internet.
 
-No independent human bounce/court ground truth, private-baseline validation set, automatic court-keypoint model, metric uncertainty calibration, hosted authentication, paid inference endpoint, audio export, doubles or full-match segmentation is claimed. The complete local workflow is implemented and tested within bounded resources; perceptual quality is exploratory. Obtain consented diverse baseline-camera clips and independently verified labels before judging a temporal ball-model improvement or enabling stronger line/speed claims.
-
-Final local browser result: the uploaded public clip completed through the actual durable worker, reported warnings, opened its generated review MP4, sought a candidate to 1.400 s, stepped to 1.433 s at 30 fps, saved a rejection with the original prediction intact, and downloaded versioned JSON. Browser video decoded at 1280×720 with readyState=4 and no media error; the saved screenshot shows paused review at 6.500 s. The direct local service was reachable and served range requests. Temporary browser-test data is local only and excluded from source/static publication.
-
-## Publication
-
-Public repository verified: https://github.com/massibrevo/baseline-lab (`PUBLIC`, nonempty). Linux GitHub Actions passed lint, mypy, offline unit/integration/actual-worker end-to-end, generated contract consistency and frontend build: [executed run](https://github.com/massibrevo/baseline-lab/actions/runs/41223338708).
-
-Sites native publication succeeded at https://baseline-lab-massibrevo.maxbrevini.chatgpt.site . Access retains the newly created owner-private audience; public example content does not mean the Site audience was made public. The native deployment verifies hosting; private remote inference remains unconfigured. The packager required a top-level supported `dist/` static root; `scripts/stage-site.mjs` stages only the built frontend. No private data or native Python worker is included in the hosted artifact.
-
-## Live playback metrics extension
-
-Added schema 1.1 per-PTS ball **image** speed (px/s), approximate player ground speed/path, and reviewed-contact shot depth. Three derivative tests cover VFR timing, missing/interpolated gaps and absent/implausible ground geometry. The actual worker/export/review smoke test checks derived sample counts, versioned CSV, and depth cleared on rejection. Total local suite: 25 passed. The public example derives the new samples from the retained measured observations, then rerenders the annotated video; separate postprocessing took 5.051 s. The prior 84.614 s inference timing remains provenance of that recorded run, not a claimed new benchmark. Physical airborne speed and 3D depth are not asserted; the camera extension below supersedes the earlier playback-only scope.
-
-Browser validation of live samples: at 6.500 s the demo rendered 640 px/s ball image motion, 4.8 km/h approximate near-player speed and 12.2 m observed path. A single PTS step to 6.533 s updated these to 920 px/s, 5.8 km/h and 12.3 m. Missing far-player speed stayed unavailable. The real clip has no independently confirmed contact annotation, so shot depth correctly stayed unavailable; the actual worker/review integration test verifies depth calculation for a manually reviewed calibrated contact and clears it on rejection. These values are demonstration of synchronization, not extra validation of detection accuracy.
-
-## Local live camera extension
-
-Implemented video-only browser capture with real media timestamps; bounded eight-frame JPEG bursts into latest-only storage; inference in the existing isolated worker slot; timestamp-matched analyzed frame files, explicit processing latency/skipped bursts, reviewed-ground-contact depth and sampled VFR MP4/JSON/CSV exports. No inference runs in HTTP handlers. Camera jobs have 60 s / 1800 sample / 1280×720 limits, 10 s idle timeout and one shared worker; interrupted captures fail rather than silently resume stale input.
-
-Executed camera transport smoke: timestamped JPEG batches from the known video fixture → actual private API → actual child worker → matched frame → manual contact depth → graceful stop → playable sampled recording and artifacts → deletion. Cross-owner state/frame/stop denied. This is not a physical webcam/lens/permission or tennis-court camera accuracy verification. Local suite now 27 tests, including a second camera transport check using the actual SSDlite weights and rights-cleared tennis frames. Browser camera access depends on the user's device/permission and is reported separately. Hosted camera processing remains unavailable without the authenticated Python backend.
-
-Physical camera browser check: the local camera dialog opens and requests video access, but the in-app browser permission request remained pending (videoWidth=0, readyState=0). Native Codex app permission UI is unavailable to computer automation, so physical hardware capture is **not verified**. The app shows a waiting-for-permission state and stops any late-resolving stream when the dialog closes. Use the local page in a camera-capable browser and grant camera permission; no system protection is disabled.
+Public source: https://github.com/massibrevo/baseline-lab. CI runs lint, types, offline tests, generated-contract consistency and frontend build; real-model tests are opt-in. The Site retains its owner-private audience and contains only the licensed precomputed example/frontend. Private hosted Python inference is not deployed. Docker configuration exists but was not built/run because no Docker daemon was available. Peak memory was not measured. No paid providers or external video-inference requests were used.

@@ -1,14 +1,14 @@
 {
   "annotation_method": "Provisional visual point annotations by Codex during implementation, before inspecting the release result; not independently verified human ground truth.",
-  "pipeline_elapsed_s": 84.614,
+  "pipeline_elapsed_s": 99.666,
   "frames": 375,
   "duration_s": 12.5,
   "detection_coverage_not_accuracy": {
-    "ball": 0.6906666666666667,
-    "near": 0.9386666666666666,
-    "far": 0.13333333333333333
+    "ball": 0.7306666666666667,
+    "near": 0.976,
+    "far": 0.752
   },
-  "candidate_events": 8,
+  "candidate_events": 5,
   "bounce_precision": null,
   "court_independent_error_px": null,
   "ball_speed_m_s": null,
@@ -16,13 +16,14 @@
     "tuning_frames": {
       "ball": {
         "n_labeled": 3,
-        "missing": 1,
-        "hits_within_tolerance": 2,
+        "missing": 0,
+        "hits_within_tolerance": 3,
         "tolerance_px": 15,
-        "median_error_when_observed_px": 1.25,
+        "median_error_when_observed_px": 1.280437628172331,
         "errors_px": [
-          2.0,
-          0.5
+          2.86423789631652,
+          1.0846618559395547,
+          1.280437628172331
         ]
       },
       "near": {
@@ -30,21 +31,22 @@
         "missing": 0,
         "hits_within_tolerance": 3,
         "tolerance_px": 35,
-        "median_error_when_observed_px": 10.559082513256035,
+        "median_error_when_observed_px": 13.132200070332521,
         "errors_px": [
-          10.559082513256035,
-          3.717031589578734,
-          14.745035415816917
+          3.9190461770560474,
+          13.531483212723467,
+          13.132200070332521
         ]
       },
       "far": {
         "n_labeled": 3,
-        "missing": 2,
-        "hits_within_tolerance": 1,
+        "missing": 1,
+        "hits_within_tolerance": 2,
         "tolerance_px": 35,
-        "median_error_when_observed_px": 3.794282835611321,
+        "median_error_when_observed_px": 6.842867156480686,
         "errors_px": [
-          3.794282835611321
+          7.468859043918995,
+          6.216875269042378
         ]
       }
     },
@@ -52,13 +54,13 @@
       "ball": {
         "n_labeled": 4,
         "missing": 1,
-        "hits_within_tolerance": 2,
+        "hits_within_tolerance": 3,
         "tolerance_px": 15,
-        "median_error_when_observed_px": 0.5,
+        "median_error_when_observed_px": 1.778228435199895,
         "errors_px": [
-          74.20411039827916,
-          0.5,
-          0.0
+          2.1087197867740755,
+          0.1508444892119671,
+          1.778228435199895
         ]
       },
       "near": {
@@ -66,24 +68,28 @@
         "missing": 0,
         "hits_within_tolerance": 6,
         "tolerance_px": 35,
-        "median_error_when_observed_px": 9.103527299527325,
+        "median_error_when_observed_px": 14.293251892784143,
         "errors_px": [
-          7.177480646293889,
-          8.220193863765722,
-          9.986860735288928,
-          3.056786633887217,
-          17.20238087855663,
-          17.312569957235038
+          13.504649781940852,
+          13.926097546201177,
+          18.36788522714546,
+          14.66040623936711,
+          20.77488908681465,
+          5.463825969661132
         ]
       },
       "far": {
         "n_labeled": 6,
-        "missing": 5,
-        "hits_within_tolerance": 1,
+        "missing": 1,
+        "hits_within_tolerance": 5,
         "tolerance_px": 35,
-        "median_error_when_observed_px": 14.36812238529846,
+        "median_error_when_observed_px": 9.89959556384345,
         "errors_px": [
-          14.36812238529846
+          9.89959556384345,
+          7.567569195152924,
+          14.459609998778532,
+          9.783754041360629,
+          10.796801986325308
         ]
       }
     }

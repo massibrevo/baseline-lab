@@ -20,6 +20,7 @@ def main():
     analyze_parser.add_argument("source", type=Path)
     analyze_parser.add_argument("output", type=Path)
     analyze_parser.add_argument("--calibration", type=Path)
+    analyze_parser.add_argument("--real-time-playback", action="store_true")
     probe = sub.add_parser("probe")
     probe.add_argument("source", type=Path)
     probe.add_argument("directory", type=Path)
@@ -31,9 +32,13 @@ def main():
     cfg = settings()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.command == "setup-models":
+        from baseline_lab.vision.ball import provision_ball
         from baseline_lab.vision.detectors import provision
+        from baseline_lab.vision.pose import provision_pose
 
         print(provision(cfg.data_dir / "models"))
+        print(provision_pose(cfg.data_dir / "models"))
+        print(provision_ball(cfg.data_dir / "models"))
     elif args.command == "serve":
         import uvicorn
 
@@ -45,10 +50,17 @@ def main():
 
         run_worker(cfg, args.once)
     elif args.command == "probe":
-        from baseline_lab.video.media import inspect, write_metadata
+        from baseline_lab.video.media import inspect, preview, write_metadata
 
-        meta = inspect(args.source, cfg, args.directory / "thumbnail.jpg")
-        write_metadata(meta, args.directory)
+        try:
+            meta = inspect(args.source, cfg, args.directory / "thumbnail.jpg")
+            preview(args.source, args.directory / "ingest.mp4", (meta.width, meta.height))
+            write_metadata(meta, args.directory)
+        except Exception as exc:
+            import sys
+
+            print(json.dumps({"error": str(exc)}), file=sys.stderr)
+            raise SystemExit(1) from None
     elif args.command == "analyze":
         from baseline_lab.contracts import Calibration
         from baseline_lab.pipeline import analyze
@@ -68,6 +80,7 @@ def main():
                 if d == 0 or (isinstance(d, int) and d % 60 == 0)
                 else None
             ),
+            real_time_playback=args.real_time_playback,
         )
         print(json.dumps({"elapsed_s": result.elapsed_s, "events": len(result.events)}))
     elif args.command == "process-job":
@@ -97,7 +110,12 @@ def main():
             else:
                 assert payload is not None
                 analyze(
-                    directory / "source", args.config.parent, cfg, payload.calibration, checkpoint
+                    directory / "source",
+                    args.config.parent,
+                    cfg,
+                    payload.calibration,
+                    checkpoint,
+                    real_time_playback=payload.real_time_playback,
                 )
             checkpoint("finishing", 1, 1)
         except (ValueError, RuntimeError, OSError, InterruptedError) as exc:

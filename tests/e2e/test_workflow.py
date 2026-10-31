@@ -49,9 +49,17 @@ def test_complete_workflow(config, clip):
     result = c.get(base + "/artifacts/result.json").json()
     assert result["ball_speed_m_s"] is None
     assert len(result["live_metrics"]) == result["metadata"]["frames"]
-    assert result["schema_version"] == "1.1"
+    assert result["schema_version"] == "1.3"
     assert c.get(base + "/result").json()["live_metrics"] == result["live_metrics"]
-    for artifact in ["annotated.mp4", "review.mp4", "tracks.csv", "events.csv", "live-metrics.csv"]:
+    for artifact in [
+        "annotated.mp4",
+        "review.mp4",
+        "tracks.csv",
+        "events.csv",
+        "live-metrics.csv",
+        "ball-speed.csv",
+        "shot-quality.csv",
+    ]:
         response = c.get(base + "/artifacts/" + artifact)
         assert response.status_code == 200 and len(response.content) > 10
     video = config.data_dir / "sessions" / sid / jid / "annotated.mp4"
@@ -65,11 +73,20 @@ def test_complete_workflow(config, clip):
         "t_s": 1.0,
         "xy_px": [320, 300],
         "notes": "Reviewed test contact",
+        "shot_evidence": {
+            "speed_kmh": 120,
+            "spin_rpm": 2400,
+            "bounce_angle_deg": 45,
+            "source": "test sensor fixture",
+        },
     }
     corrected = c.post(base + "/events", headers=H, json=correction)
     assert corrected.status_code == 200, corrected.text
     event = corrected.json()["events"][-1]
     assert event["court_m"] is not None and event["classification"] == "uncertain"
+    assert event["shot_quality"]["status"] == "complete"
+    assert event["shot_quality"]["available_factors"] == 5
+    assert event["shot_quality"]["error_attribution"] == "undetermined"
     assert event["shot_depth_m"] == pytest.approx(
         min(event["court_m"][1], 23.77 - event["court_m"][1])
     )
@@ -80,6 +97,57 @@ def test_complete_workflow(config, clip):
     event = rejected.json()["events"][-1]
     assert event["original_prediction"]["status"] == "manual"
     assert event["court_m"] is None and event["shot_depth_m"] is None
+    assert event["shot_quality"]["score"] is None
+    # Review a candidate stroke without overwriting its original prediction.
+    import json
+
+    result_file = config.data_dir / "sessions" / sid / jid / "result.json"
+    saved = json.loads(result_file.read_text())
+    saved["shots"] = [
+        {
+            "id": "shot-test",
+            "t_s": 1,
+            "frame": 30,
+            "player": "near",
+            "kind": "unknown",
+            "evidence_score": 0.5,
+        }
+    ]
+    result_file.write_text(json.dumps(saved))
+    other = TestClient(create_app(config))
+    other.get("/api/v1/identity")
+    assert (
+        other.patch(base + "/shots/shot-test", headers=H, json={"kind": "forehand"}).status_code
+        == 404
+    )
+    reviewed = c.patch(base + "/shots/shot-test", headers=H, json={"kind": "forehand"})
+    assert reviewed.status_code == 200
+    stroke = reviewed.json()["shots"][0]
+    assert stroke["kind"] == "forehand" and stroke["status"] == "reviewed"
+    assert stroke["original_prediction"]["kind"] == "unknown"
+    assert (
+        c.patch(base + "/shots/shot-test", headers=H, json={"kind": "fabricated"}).status_code
+        == 422
+    )
+    assert (
+        other.post(
+            base + "/shots", headers=H, json={"t_s": 2.1, "player": "near", "kind": "forehand"}
+        ).status_code
+        == 404
+    )
+    annotated = c.post(
+        base + "/shots", headers=H, json={"t_s": 2.1, "player": "near", "kind": "forehand"}
+    )
+    assert annotated.status_code == 200
+    stroke = annotated.json()["shots"][-1]
+    assert stroke["t_s"] == 2.1 and stroke["kind"] == "forehand" and stroke["status"] == "reviewed"
+    assert stroke["frame"] == 63
+    assert (
+        c.post(
+            base + "/shots", headers=H, json={"t_s": 100, "player": "near", "kind": "backhand"}
+        ).status_code
+        == 422
+    )
     assert c.delete("/api/v1/sessions/" + sid, headers=H).status_code == 204
     assert not (config.data_dir / "sessions" / sid).exists()
     assert c.get(base + "/artifacts/annotated.mp4").status_code == 404
@@ -169,3 +237,11 @@ def test_real_weights_and_real_clip(tmp_path):
     people = detector.detect(image)
     assert people and all(p["score"] >= 0.35 for p in people)
     assert any(100 < p["bbox"][0] < 250 and p["bbox"][3] > 550 for p in people)
+    from baseline_lab.contracts import Observation
+    from baseline_lab.vision.pose import PoseEstimator
+
+    near = max(people, key=lambda p: p["score"])
+    point = Observation(t_s=0, frame=0, state="detected", bbox_px=near["bbox"])
+    PoseEstimator(cfg.data_dir / "models").estimate(image, point, None)
+    assert point.pose_score > 0.5
+    assert len([p for p in point.keypoints if p.xy_px]) >= 10

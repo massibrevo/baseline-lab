@@ -17,7 +17,7 @@ class CameraStability:
             (640, round(image.shape[0] * 640 / image.shape[1])),
         )
 
-    def drift(self, image: np.ndarray) -> float | None:
+    def mapping(self, image: np.ndarray):
         kp, desc = self.orb.detectAndCompute(self.small(image), None)
         if desc is None or self.descriptors is None:
             return None
@@ -36,4 +36,18 @@ class CameraStability:
             return None
         anchors = np.asarray([[[160, 120], [480, 120], [480, 300], [160, 300]]], dtype=np.float32)
         transformed = cv2.perspectiveTransform(anchors, h)
-        return float(np.median(np.linalg.norm(transformed - anchors, axis=2)) * self.width / 640)
+        projected = cv2.perspectiveTransform(src[None], h)[0]
+        residual = float(
+            np.median(np.linalg.norm(projected - dst, axis=1)[mask.ravel() > 0]) * self.width / 640
+        )
+        spread = np.ptp(src[mask.ravel() > 0], axis=0)
+        if residual > 4 or spread[0] < 160 or spread[1] < 80:
+            return None
+        scale = np.diag([640 / self.width, 640 / self.width, 1.0])
+        display_h = np.linalg.inv(scale) @ h @ scale
+        drift = float(np.median(np.linalg.norm(transformed - anchors, axis=2)) * self.width / 640)
+        return display_h, drift, residual
+
+    def drift(self, image: np.ndarray) -> float | None:
+        result = self.mapping(image)
+        return result[1] if result is not None else None

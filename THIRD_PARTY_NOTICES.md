@@ -1,6 +1,6 @@
 # Separate rights and notices
 
-Original application code: MIT. No code was copied from the reviewed Tennis-Analysis-System (Apache-2.0). Its study is attributed in docs/reference-review.md; its media/model weights are not bundled.
+Original application code: MIT. WASB HRNet architecture is vendored under its MIT license, with Microsoft/NTT attribution and the upstream revision retained in the file. See licenses/wasb-MIT.txt. No code was copied from the reviewed Tennis-Analysis-System (Apache-2.0). Its study is attributed in docs/reference-review.md; its media/model weights are not bundled.
 
 ## Example media
 
@@ -20,3 +20,6 @@ Changes: 3840×2160 to 1280×720, silent H.264 transcode, 60→30 fps in stabili
 CourtSide was reviewed but is not installed/downloaded by the app. Its model card says MIT; Ultralytics dependency/model terms (AGPL-3.0 or enterprise) and training-data rights require separate review. WASB code is MIT but separately verified checkpoint/data terms were unavailable. Neither is included by implication.
 
 Fonts: platform sans-serif/monospace/Georgia fallbacks; no downloaded font files. Original SVG court/wordmark uses original geometry, no third-party icon pack.
+
+
+Current research models: RTMPose-m graph from OpenMMLab / Tau-J's maintainer mirror; code Apache-2.0, dataset/checkpoint terms separate. WASB tennis weights from the author's published model zoo; the software repository is MIT, while no additional blanket grant over training video rights is asserted. Checkpoints are fetched separately with checksums and are not in Git/Sites. The retired MediaPipe evaluation graph was from the Apache-2.0 OpenCV Zoo directory and is not required by the current profile.
