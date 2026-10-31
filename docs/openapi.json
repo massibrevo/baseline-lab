@@ -622,6 +622,247 @@
           }
         }
       }
+    },
+    "/api/v1/camera": {
+      "post": {
+        "summary": "Create",
+        "operationId": "create_api_v1_camera_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveSessionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/camera/{sid}/frames": {
+      "post": {
+        "summary": "Frames",
+        "operationId": "frames_api_v1_camera__sid__frames_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CameraBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/camera/{sid}/state": {
+      "get": {
+        "summary": "State",
+        "operationId": "state_api_v1_camera__sid__state_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/camera/{sid}/frame": {
+      "get": {
+        "summary": "Image",
+        "operationId": "image_api_v1_camera__sid__frame_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/camera/{sid}/contacts": {
+      "post": {
+        "summary": "Contact",
+        "operationId": "contact_api_v1_camera__sid__contacts_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Correction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/camera/{sid}/stop": {
+      "post": {
+        "summary": "Stop",
+        "operationId": "stop_api_v1_camera__sid__stop_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -667,6 +908,53 @@
           "corners_px"
         ],
         "title": "Calibration"
+      },
+      "CameraBatch": {
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "maximum": 1800.0,
+            "minimum": 0.0,
+            "title": "Sequence"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/CameraFrame"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence",
+          "frames"
+        ],
+        "title": "CameraBatch"
+      },
+      "CameraFrame": {
+        "properties": {
+          "t_s": {
+            "type": "number",
+            "maximum": 60.0,
+            "minimum": 0.0,
+            "title": "T S"
+          },
+          "jpeg_base64": {
+            "type": "string",
+            "maxLength": 550000,
+            "minLength": 20,
+            "title": "Jpeg Base64"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t_s",
+          "jpeg_base64"
+        ],
+        "title": "CameraFrame"
       },
       "Correction": {
         "properties": {
@@ -949,6 +1237,56 @@
         ],
         "title": "LiveMetrics",
         "description": "Measurements at one presentation timestamp; nulls are deliberate evidence gaps."
+      },
+      "LiveSessionInput": {
+        "properties": {
+          "reference_jpeg_base64": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 550000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Jpeg Base64"
+          },
+          "width": {
+            "type": "integer",
+            "maximum": 1280.0,
+            "minimum": 320.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "maximum": 720.0,
+            "minimum": 240.0,
+            "title": "Height"
+          },
+          "calibration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Calibration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suitability_confirmed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Suitability Confirmed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "suitability_confirmed"
+        ],
+        "title": "LiveSessionInput"
       },
       "Metadata": {
         "properties": {

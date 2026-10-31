@@ -109,3 +109,21 @@ class Result(BaseModel):
         if self.ball_speed_m_s is not None:
             raise ValueError("Validated 3D speed is not implemented")
         return self
+
+
+class LiveSessionInput(BaseModel):
+    reference_jpeg_base64: str | None = Field(default=None, max_length=550000)
+    width: int = Field(ge=320, le=1280)
+    height: int = Field(ge=240, le=720)
+    calibration: Calibration | None = None
+    suitability_confirmed: Literal[True]
+
+
+class CameraFrame(BaseModel):
+    t_s: float = Field(ge=0, le=60)
+    jpeg_base64: str = Field(min_length=20, max_length=550000)
+
+
+class CameraBatch(BaseModel):
+    sequence: int = Field(ge=0, le=1800)
+    frames: list[CameraFrame] = Field(min_length=1, max_length=8)

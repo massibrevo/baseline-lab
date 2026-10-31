@@ -21,3 +21,7 @@ Original code MIT; example media/derivatives CC BY-SA 4.0. Never assume a Hub ca
 ## Working policy
 
 Prefer small cohesive modules and honest failure over decorative controls. Test meaningful scientific/lifecycle behavior, then avoid unnecessary repetitions. Keep docs and model manifests aligned with actual execution. Agent profiles in `.github/agents` describe actionable duties only; do not fabricate delegation or reports. No runtime multi-agent AI is needed. Do not spawn subagents unless directly requested by the user or an applicable skill explicitly directs delegation.
+
+## Live camera path
+
+`api/camera.py` transports bounded JPEG batches; `jobs/camera.py` runs in the same isolated single-worker slot as uploads. `video/camera_recording.py` preserves sampled capture timing. `apps/web/src/camera.ts` owns browser permission/capture/review cleanup. Never overlay delayed camera analysis on a newer live frame; show the matching analyzed image with latency. Use only manually reviewed contacts for shot depth and invalidate moved-camera calibration. Test `tests/e2e/test_camera.py`; distinguish protocol replay from physical hardware verification.

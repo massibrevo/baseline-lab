@@ -8,9 +8,9 @@ This is a working experimental local vertical slice and hosted-example frontend,
 |---|---|
 | Locked Python environment and frontend dependencies | Executed; uv.lock and package-lock.json; Python 3.12.14, Node 22.12.0 |
 | Ruff lint / formatter | Passed on src, scripts and tests |
-| mypy | Passed across 17 source modules |
+| mypy | Passed across 20 source modules |
 | Pydantic-generated frontend types / production TypeScript build | Passed |
-| pytest | **25 passed**, including the explicit real-checkpoint/real-image model test; one Starlette/httpx deprecation warning |
+| pytest | **27 passed**, including the explicit real-checkpoint/real-image model test; one Starlette/httpx deprecation warning |
 | Geometry | Known correspondences, inverse, degenerate/order rejection, letterbox offsets, uncertainty around lines passed |
 | Timestamps | Real-PTS MP4/VFR decode and annotated H.264 roundtrip passed; original integer PTS retained |
 | Rotation | H.264 MOV with a real 90-degree display matrix passed; normalized display dimensions and PTS verified |
@@ -59,6 +59,14 @@ Sites native publication succeeded at https://baseline-lab-massibrevo.maxbrevini
 
 ## Live playback metrics extension
 
-Added schema 1.1 per-PTS ball **image** speed (px/s), approximate player ground speed/path, and reviewed-contact shot depth. Three derivative tests cover VFR timing, missing/interpolated gaps and absent/implausible ground geometry. The actual worker/export/review smoke test checks derived sample counts, versioned CSV, and depth cleared on rejection. Total local suite: 25 passed. The public example derives the new samples from the retained measured observations, then rerenders the annotated video; separate postprocessing took 5.051 s. The prior 84.614 s inference timing remains provenance of that recorded run, not a claimed new benchmark. No streaming-camera inference, physical airborne speed or 3D depth is asserted.
+Added schema 1.1 per-PTS ball **image** speed (px/s), approximate player ground speed/path, and reviewed-contact shot depth. Three derivative tests cover VFR timing, missing/interpolated gaps and absent/implausible ground geometry. The actual worker/export/review smoke test checks derived sample counts, versioned CSV, and depth cleared on rejection. Total local suite: 25 passed. The public example derives the new samples from the retained measured observations, then rerenders the annotated video; separate postprocessing took 5.051 s. The prior 84.614 s inference timing remains provenance of that recorded run, not a claimed new benchmark. Physical airborne speed and 3D depth are not asserted; the camera extension below supersedes the earlier playback-only scope.
 
 Browser validation of live samples: at 6.500 s the demo rendered 640 px/s ball image motion, 4.8 km/h approximate near-player speed and 12.2 m observed path. A single PTS step to 6.533 s updated these to 920 px/s, 5.8 km/h and 12.3 m. Missing far-player speed stayed unavailable. The real clip has no independently confirmed contact annotation, so shot depth correctly stayed unavailable; the actual worker/review integration test verifies depth calculation for a manually reviewed calibrated contact and clears it on rejection. These values are demonstration of synchronization, not extra validation of detection accuracy.
+
+## Local live camera extension
+
+Implemented video-only browser capture with real media timestamps; bounded eight-frame JPEG bursts into latest-only storage; inference in the existing isolated worker slot; timestamp-matched analyzed frame files, explicit processing latency/skipped bursts, reviewed-ground-contact depth and sampled VFR MP4/JSON/CSV exports. No inference runs in HTTP handlers. Camera jobs have 60 s / 1800 sample / 1280×720 limits, 10 s idle timeout and one shared worker; interrupted captures fail rather than silently resume stale input.
+
+Executed camera transport smoke: timestamped JPEG batches from the known video fixture → actual private API → actual child worker → matched frame → manual contact depth → graceful stop → playable sampled recording and artifacts → deletion. Cross-owner state/frame/stop denied. This is not a physical webcam/lens/permission or tennis-court camera accuracy verification. Local suite now 27 tests, including a second camera transport check using the actual SSDlite weights and rights-cleared tennis frames. Browser camera access depends on the user's device/permission and is reported separately. Hosted camera processing remains unavailable without the authenticated Python backend.
+
+Physical camera browser check: the local camera dialog opens and requests video access, but the in-app browser permission request remained pending (videoWidth=0, readyState=0). Native Codex app permission UI is unavailable to computer automation, so physical hardware capture is **not verified**. The app shows a waiting-for-permission state and stops any late-resolving stream when the dialog closes. Use the local page in a camera-capable browser and grant camera permission; no system protection is disabled.

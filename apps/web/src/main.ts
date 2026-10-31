@@ -1,4 +1,5 @@
 import './style.css';
+import {openCamera} from './camera';
 import type {Analysis, Event as Bounce, Observation} from './contracts';
 
 const $ = <T extends HTMLElement = HTMLElement>(s:string) => document.querySelector<T>(s)!;
@@ -34,7 +35,7 @@ function shell() {
   <div class="sidebar-caption">THE ANALYSIS DESK</div><button class="nav selected" id="desk"><span>▦</span> Workspace <small>01</small></button><button class="nav" id="session-nav"><span>▤</span> Your sessions</button><button class="nav" id="method-nav"><span>⌁</span> Field notes</button>
   <div class="sidebar-session"><span class="eyebrow">CURRENT SESSION</span><b id="side-title">Example 01</b><span id="side-status">Public reference clip</span><div class="tiny-court"><i></i><i></i></div></div>
   <div class="sidebar-bottom"><span class="live-dot"></span><span id="connection">Checking local service…</span><p>Observe. Question. Improve.</p><a href="https://github.com/massibrevo/baseline-lab" target="_blank" rel="noreferrer">Source & documentation ↗</a><span class="version">RESEARCH RELEASE / v0.1</span></div></aside>
-  <main><header><div class="breadcrumb">Workspace <span>/</span> <b id="header-title">Example 01</b></div><div class="header-actions"><span class="status" id="mode">DEMO / PRECOMPUTED</span><button id="upload" class="button primary">＋ Upload clip</button></div></header>
+  <main><header><div class="breadcrumb">Workspace <span>/</span> <b id="header-title">Example 01</b></div><div class="header-actions"><span class="status" id="mode">DEMO / PRECOMPUTED</span><button id="camera" class="button">◉ Live camera</button><button id="upload" class="button primary">＋ Upload clip</button></div></header>
   <div id="notice" class="notice hidden" role="status"></div>
   <section class="workspace"><div class="heading"><div><div class="eyebrow">RALLY STUDY <span class="tiny-number">/ 001</span></div><h1 id="session-title">The open court.</h1><p id="subtitle">One rally. A different perspective.</p></div><div class="heading-actions"><button class="button" id="export">Export ↗</button><button class="icon-button" id="delete" aria-label="Delete session">⌫</button></div></div>
   <div class="demo-note" id="demo-note"><b>PUBLIC DEMONSTRATION</b><span>Real footage. Pipeline-generated tracks. Detection failures are part of this study.</span></div>
@@ -53,6 +54,7 @@ function shell() {
   $('#method-nav').onclick=()=>selectTab('methodology');
   $('#session-nav').onclick=showSessions;
   $('#upload').onclick=showUpload;
+  $('#camera').onclick=()=>openCamera({local,api,modal,notice});
   $('#export').onclick=showExports;
   $('#delete').onclick=deleteSession;
   $('#close-dialog').onclick=()=>{calibrationMode=false;$<HTMLDialogElement>('#dialog').close();};

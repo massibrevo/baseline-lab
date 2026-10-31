@@ -76,7 +76,10 @@ def main():
         from baseline_lab.storage.database import Database
 
         db = Database(cfg.data_dir)
-        payload = Submission.model_validate_json(args.config.read_text())
+        raw_payload = json.loads(args.config.read_text())
+        payload = (
+            Submission.model_validate(raw_payload) if raw_payload.get("kind") != "camera" else None
+        )
 
         def checkpoint(stage, done, total):
             with db.connect() as c:
@@ -87,7 +90,15 @@ def main():
 
         try:
             directory = cfg.data_dir / "sessions" / args.sid
-            analyze(directory / "source", args.config.parent, cfg, payload.calibration, checkpoint)
+            if raw_payload.get("kind") == "camera":
+                from baseline_lab.jobs.camera import run_camera
+
+                run_camera(directory, args.config.parent, raw_payload, cfg, checkpoint)
+            else:
+                assert payload is not None
+                analyze(
+                    directory / "source", args.config.parent, cfg, payload.calibration, checkpoint
+                )
             checkpoint("finishing", 1, 1)
         except (ValueError, RuntimeError, OSError, InterruptedError) as exc:
             (args.config.parent / "error.json").write_text(json.dumps({"error": str(exc)}))

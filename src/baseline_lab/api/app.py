@@ -16,6 +16,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from baseline_lab.analytics.live import live_metrics
 from baseline_lab.api.auth import mint, owner, secret
+from baseline_lab.api.camera import camera_router
 from baseline_lab.contracts import Correction, Event, Result, Submission
 from baseline_lab.geometry.court import Court
 from baseline_lab.rendering.export import csvs
@@ -59,6 +60,10 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
                 return JSONResponse({"detail": "content_length_required"}, 411)
             if not length.isdigit() or int(length) > (cfg.max_upload_mb + 1) * 1024 * 1024:
                 return JSONResponse({"detail": "request_body_limit_exceeded"}, 413)
+        if request.method == "POST" and request.url.path.startswith("/api/v1/camera"):
+            length = request.headers.get("content-length", "")
+            if not length.isdigit() or int(length) > 4500000:
+                return JSONResponse({"detail": "camera_request_limit"}, 413)
         if request.method in {"POST", "PATCH", "DELETE"}:
             origin = request.headers.get("origin")
             if origin and origin not in cfg.allowed_origins:
@@ -336,6 +341,7 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
             shutil.rmtree(cfg.data_dir / "sessions" / sid, ignore_errors=True)
         return Response(status_code=204)
 
+    app.include_router(camera_router(cfg, db))
     dist = ROOT / "apps" / "web" / "dist"
     if dist.exists():
         app.mount("/", StaticFiles(directory=dist, html=True), name="web")

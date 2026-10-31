@@ -65,6 +65,8 @@ class Database:
             queued = c.execute(
                 "SELECT count(*) FROM jobs WHERE state IN ('queued','running')"
             ).fetchone()[0]
+            if payload.get("kind") == "camera" and queued:
+                raise ValueError("worker_busy")
             if queued >= 5:
                 raise ValueError("local_queue_limit_5")
             jid = uuid.uuid4().hex
@@ -112,6 +114,10 @@ class Database:
     def recover(self):
         # Caller holds exclusive OS worker lock, so no live worker can own these jobs.
         with self.connect() as c:
+            c.execute(
+                "UPDATE jobs SET state='failed',stage='failed',error='live_capture_interrupted' "
+                "WHERE state='running' AND json_extract(payload,'$.kind')='camera'"
+            )
             c.execute(
                 "UPDATE jobs SET state='queued',stage='recovered_after_restart',updated=? "
                 "WHERE state='running' AND cancel=0",
