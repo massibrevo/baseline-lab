@@ -63,6 +63,8 @@ class Event(BaseModel):
     status: Literal["candidate", "confirmed", "rejected", "manual"] = "candidate"
     classification: Literal["estimated_in", "estimated_out", "uncertain"] = "uncertain"
     court_m: Point | None = None
+    shot_depth_m: float | None = None
+    depth_semantics: str = "signed distance inside receiving baseline; reviewed ground contact only"
     original_prediction: dict | None = None
     notes: str = ""
 
@@ -74,14 +76,30 @@ class Correction(BaseModel):
     notes: str = Field(default="", max_length=1000)
 
 
+class LiveMetrics(BaseModel):
+    """Measurements at one presentation timestamp; nulls are deliberate evidence gaps."""
+
+    t_s: float
+    frame: int
+    ball_image_speed_px_s: float | None = None
+    ball_image_speed_reason: str | None = None
+    near_speed_m_s: float | None = None
+    far_speed_m_s: float | None = None
+    near_observed_distance_m: float | None = None
+    far_observed_distance_m: float | None = None
+    ball_observation_coverage_so_far: float
+    contact_candidates_so_far: int
+
+
 class Result(BaseModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.1"
     metadata: Metadata
     tracks: list[Track]
     events: list[Event]
     calibration: dict | None
     warnings: list[str]
     provenance: dict
+    live_metrics: list[LiveMetrics] = []
     ball_speed_m_s: float | None = None
     ball_speed_reason: str = "single_view_3d_speed_not_validated"
     elapsed_s: float

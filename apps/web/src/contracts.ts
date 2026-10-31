@@ -9,8 +9,22 @@ export interface Event {
   status: 'candidate' | 'confirmed' | 'rejected' | 'manual';
   classification: 'estimated_in' | 'estimated_out' | 'uncertain';
   court_m: [number, number] | null;
+  shot_depth_m: number | null;
+  depth_semantics: string;
   original_prediction: Record<string, any> | null;
   notes: string
+}
+export interface LiveMetrics {
+  t_s: number;
+  frame: number;
+  ball_image_speed_px_s: number | null;
+  ball_image_speed_reason: string | null;
+  near_speed_m_s: number | null;
+  far_speed_m_s: number | null;
+  near_observed_distance_m: number | null;
+  far_observed_distance_m: number | null;
+  ball_observation_coverage_so_far: number;
+  contact_candidates_so_far: number
 }
 export interface Metadata {
   width: number;
@@ -45,13 +59,14 @@ export interface Track {
   distance_reason: string | null
 }
 export interface Analysis {
-  schema_version: '1.0';
+  schema_version: '1.0' | '1.1';
   metadata: Metadata;
   tracks: (Track)[];
   events: (Event)[];
   calibration: Record<string, any> | null;
   warnings: (string)[];
   provenance: Record<string, any>;
+  live_metrics: (LiveMetrics)[];
   ball_speed_m_s: number | null;
   ball_speed_reason: string;
   elapsed_s: number

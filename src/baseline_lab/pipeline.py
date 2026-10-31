@@ -10,6 +10,7 @@ from pathlib import Path
 import cv2
 
 from baseline_lab.analytics.events import candidates
+from baseline_lab.analytics.live import live_metrics
 from baseline_lab.contracts import Calibration, Result
 from baseline_lab.geometry.court import Court
 from baseline_lab.rendering.export import annotated, csvs
@@ -137,6 +138,7 @@ def analyze(
         },
         elapsed_s=0,
     )
+    result.live_metrics = live_metrics(result)
     (output / "raw-detections.json").write_text(json.dumps(raw))
     annotated(source, output / "annotated.mp4", result, checkpoint)
     checkpoint("preparing_playback", 0, None)

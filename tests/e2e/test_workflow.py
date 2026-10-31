@@ -48,7 +48,10 @@ def test_complete_workflow(config, clip):
     base = f"/api/v1/sessions/{sid}/jobs/{jid}"
     result = c.get(base + "/artifacts/result.json").json()
     assert result["ball_speed_m_s"] is None
-    for artifact in ["annotated.mp4", "review.mp4", "tracks.csv", "events.csv"]:
+    assert len(result["live_metrics"]) == result["metadata"]["frames"]
+    assert result["schema_version"] == "1.1"
+    assert c.get(base + "/result").json()["live_metrics"] == result["live_metrics"]
+    for artifact in ["annotated.mp4", "review.mp4", "tracks.csv", "events.csv", "live-metrics.csv"]:
         response = c.get(base + "/artifacts/" + artifact)
         assert response.status_code == 200 and len(response.content) > 10
     video = config.data_dir / "sessions" / sid / jid / "annotated.mp4"
@@ -67,13 +70,16 @@ def test_complete_workflow(config, clip):
     assert corrected.status_code == 200, corrected.text
     event = corrected.json()["events"][-1]
     assert event["court_m"] is not None and event["classification"] == "uncertain"
+    assert event["shot_depth_m"] == pytest.approx(
+        min(event["court_m"][1], 23.77 - event["court_m"][1])
+    )
     rejected = c.patch(
         base + "/events/" + event["id"], headers=H, json={**correction, "status": "rejected"}
     )
     assert rejected.status_code == 200
     event = rejected.json()["events"][-1]
     assert event["original_prediction"]["status"] == "manual"
-    assert event["court_m"] is None
+    assert event["court_m"] is None and event["shot_depth_m"] is None
     assert c.delete("/api/v1/sessions/" + sid, headers=H).status_code == 204
     assert not (config.data_dir / "sessions" / sid).exists()
     assert c.get(base + "/artifacts/annotated.mp4").status_code == 404

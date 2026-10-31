@@ -399,6 +399,54 @@
         }
       }
     },
+    "/api/v1/sessions/{sid}/jobs/{jid}/result": {
+      "get": {
+        "summary": "Typed Result",
+        "operationId": "typed_result_api_v1_sessions__sid__jobs__jid__result_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          },
+          {
+            "name": "jid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{sid}/jobs/{jid}/artifacts/{name}": {
       "get": {
         "summary": "Artifact",
@@ -665,6 +713,135 @@
         ],
         "title": "Correction"
       },
+      "Event": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "t_s": {
+            "type": "number",
+            "title": "T S"
+          },
+          "frame": {
+            "type": "integer",
+            "title": "Frame"
+          },
+          "xy_px": {
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Xy Px"
+          },
+          "evidence_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Score"
+          },
+          "score_semantics": {
+            "type": "string",
+            "title": "Score Semantics",
+            "default": "heuristic temporal-evidence score; not probability"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "candidate",
+              "confirmed",
+              "rejected",
+              "manual"
+            ],
+            "title": "Status",
+            "default": "candidate"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "estimated_in",
+              "estimated_out",
+              "uncertain"
+            ],
+            "title": "Classification",
+            "default": "uncertain"
+          },
+          "court_m": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Court M"
+          },
+          "shot_depth_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Depth M"
+          },
+          "depth_semantics": {
+            "type": "string",
+            "title": "Depth Semantics",
+            "default": "signed distance inside receiving baseline; reviewed ground contact only"
+          },
+          "original_prediction": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Prediction"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "t_s",
+          "frame",
+          "xy_px"
+        ],
+        "title": "Event"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -677,6 +854,419 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "LiveMetrics": {
+        "properties": {
+          "t_s": {
+            "type": "number",
+            "title": "T S"
+          },
+          "frame": {
+            "type": "integer",
+            "title": "Frame"
+          },
+          "ball_image_speed_px_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ball Image Speed Px S"
+          },
+          "ball_image_speed_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ball Image Speed Reason"
+          },
+          "near_speed_m_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Near Speed M S"
+          },
+          "far_speed_m_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Far Speed M S"
+          },
+          "near_observed_distance_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Near Observed Distance M"
+          },
+          "far_observed_distance_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Far Observed Distance M"
+          },
+          "ball_observation_coverage_so_far": {
+            "type": "number",
+            "title": "Ball Observation Coverage So Far"
+          },
+          "contact_candidates_so_far": {
+            "type": "integer",
+            "title": "Contact Candidates So Far"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t_s",
+          "frame",
+          "ball_observation_coverage_so_far",
+          "contact_candidates_so_far"
+        ],
+        "title": "LiveMetrics",
+        "description": "Measurements at one presentation timestamp; nulls are deliberate evidence gaps."
+      },
+      "Metadata": {
+        "properties": {
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          },
+          "codec": {
+            "type": "string",
+            "title": "Codec"
+          },
+          "frames": {
+            "type": "integer",
+            "title": "Frames"
+          },
+          "nominal_fps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nominal Fps"
+          },
+          "variable_frame_rate": {
+            "type": "boolean",
+            "title": "Variable Frame Rate"
+          },
+          "rotation_deg": {
+            "type": "integer",
+            "title": "Rotation Deg"
+          },
+          "timestamps_s": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Timestamps S"
+          },
+          "original_pts": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Original Pts"
+          },
+          "time_base": {
+            "type": "string",
+            "title": "Time Base"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "duration_s",
+          "codec",
+          "frames",
+          "nominal_fps",
+          "variable_frame_rate",
+          "rotation_deg",
+          "timestamps_s",
+          "original_pts",
+          "time_base"
+        ],
+        "title": "Metadata"
+      },
+      "Observation": {
+        "properties": {
+          "t_s": {
+            "type": "number",
+            "title": "T S"
+          },
+          "frame": {
+            "type": "integer",
+            "title": "Frame"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "detected",
+              "interpolated",
+              "missing",
+              "rejected"
+            ],
+            "title": "State"
+          },
+          "xy_px": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xy Px"
+          },
+          "raw_xy_px": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Xy Px"
+          },
+          "bbox_px": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox Px"
+          },
+          "court_m": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Court M"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t_s",
+          "frame",
+          "state"
+        ],
+        "title": "Observation"
+      },
+      "Result": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "enum": [
+              "1.0",
+              "1.1"
+            ],
+            "title": "Schema Version",
+            "default": "1.1"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/Track"
+            },
+            "type": "array",
+            "title": "Tracks"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "calibration": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Provenance"
+          },
+          "live_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/LiveMetrics"
+            },
+            "type": "array",
+            "title": "Live Metrics",
+            "default": []
+          },
+          "ball_speed_m_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ball Speed M S"
+          },
+          "ball_speed_reason": {
+            "type": "string",
+            "title": "Ball Speed Reason",
+            "default": "single_view_3d_speed_not_validated"
+          },
+          "elapsed_s": {
+            "type": "number",
+            "title": "Elapsed S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metadata",
+          "tracks",
+          "events",
+          "calibration",
+          "warnings",
+          "provenance",
+          "elapsed_s"
+        ],
+        "title": "Result"
       },
       "Submission": {
         "properties": {
@@ -708,6 +1298,54 @@
           "idempotency_key"
         ],
         "title": "Submission"
+      },
+      "Track": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/Observation"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "coverage": {
+            "type": "number",
+            "title": "Coverage"
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          },
+          "distance_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "observations",
+          "coverage"
+        ],
+        "title": "Track"
       },
       "ValidationError": {
         "properties": {

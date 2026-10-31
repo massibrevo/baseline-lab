@@ -13,6 +13,12 @@ from baseline_lab.video.media import frames
 
 
 def csvs(result: Result, directory: Path) -> None:
+    with (directory / "live-metrics.csv").open("w", newline="") as live:
+        writer = csv.writer(live)
+        fields = list(result.live_metrics[0].model_dump()) if result.live_metrics else []
+        writer.writerow(fields)
+        for sample in result.live_metrics:
+            writer.writerow(sample.model_dump().values())
     with (directory / "tracks.csv").open("w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
@@ -56,6 +62,7 @@ def csvs(result: Result, directory: Path) -> None:
                 "classification",
                 "court_x_m",
                 "court_y_m",
+                "shot_depth_m",
                 "evidence_score",
                 "notes",
             ]
@@ -72,6 +79,7 @@ def csvs(result: Result, directory: Path) -> None:
                     e.status,
                     e.classification,
                     *(e.court_m or (None, None)),
+                    e.shot_depth_m,
                     e.evidence_score,
                     notes,
                 ]
@@ -122,6 +130,19 @@ def annotated(source: Path, target: Path, result: Result, checkpoint) -> None:
                 1,
                 cv2.LINE_AA,
             )
+            if result.live_metrics:
+                measurement = result.live_metrics[i]
+                if measurement.ball_image_speed_px_s is not None:
+                    cv2.putText(
+                        image,
+                        f"BALL IMAGE {measurement.ball_image_speed_px_s:.0f} px/s",
+                        (15, meta.height - 22),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.45,
+                        (245, 240, 230),
+                        1,
+                        cv2.LINE_AA,
+                    )
             frame = av.VideoFrame.from_ndarray(image, format="bgr24")
             frame.pts = round(t * 90000)
             frame.time_base = Fraction(1, 90000)

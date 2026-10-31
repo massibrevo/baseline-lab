@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from baseline_lab.analytics.live import live_metrics
 from baseline_lab.api.auth import mint, owner, secret
 from baseline_lab.contracts import Correction, Event, Result, Submission
 from baseline_lab.geometry.court import Court
@@ -29,6 +30,7 @@ ARTIFACTS = {
     "events.csv",
     "tracks.csv",
     "raw-detections.json",
+    "live-metrics.csv",
 }
 
 
@@ -225,6 +227,11 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
             )
         return job_for(sid, jid)
 
+    @app.get("/api/v1/sessions/{sid}/jobs/{jid}/result", response_model=Result)
+    def typed_result(sid: str, jid: str, identity: str = Depends(owner)):
+        session(sid, identity)
+        return Result.model_validate_json((result_path(sid, jid) / "result.json").read_text())
+
     @app.get("/api/v1/sessions/{sid}/jobs/{jid}/artifacts/{name}")
     def artifact(sid: str, jid: str, name: str, identity: str = Depends(owner)):
         session(sid, identity)
@@ -284,7 +291,12 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
 
                 court = Court(Calibration(corners_px=result.calibration["corners_px"]))
                 event.court_m = court.project(event.xy_px)
+            event.shot_depth_m = (
+                min(event.court_m[1], 23.77 - event.court_m[1]) if event.court_m else None
+            )
             event.classification = "uncertain"
+            result.schema_version = "1.1"
+            result.live_metrics = live_metrics(result)
             temp = directory / "result.edit.json"
             temp.write_text(result.model_dump_json())
             temp.replace(directory / "result.json")

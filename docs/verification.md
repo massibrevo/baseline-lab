@@ -8,9 +8,9 @@ This is a working experimental local vertical slice and hosted-example frontend,
 |---|---|
 | Locked Python environment and frontend dependencies | Executed; uv.lock and package-lock.json; Python 3.12.14, Node 22.12.0 |
 | Ruff lint / formatter | Passed on src, scripts and tests |
-| mypy | Passed across 16 source modules |
+| mypy | Passed across 17 source modules |
 | Pydantic-generated frontend types / production TypeScript build | Passed |
-| pytest | **22 passed**, including the explicit real-checkpoint/real-image model test; one Starlette/httpx deprecation warning |
+| pytest | **25 passed**, including the explicit real-checkpoint/real-image model test; one Starlette/httpx deprecation warning |
 | Geometry | Known correspondences, inverse, degenerate/order rejection, letterbox offsets, uncertainty around lines passed |
 | Timestamps | Real-PTS MP4/VFR decode and annotated H.264 roundtrip passed; original integer PTS retained |
 | Rotation | H.264 MOV with a real 90-degree display matrix passed; normalized display dimensions and PTS verified |
@@ -56,3 +56,9 @@ Final local browser result: the uploaded public clip completed through the actua
 Public repository verified: https://github.com/massibrevo/baseline-lab (`PUBLIC`, nonempty). Linux GitHub Actions passed lint, mypy, offline unit/integration/actual-worker end-to-end, generated contract consistency and frontend build: [executed run](https://github.com/massibrevo/baseline-lab/actions/runs/41223338708).
 
 Sites native publication succeeded at https://baseline-lab-massibrevo.maxbrevini.chatgpt.site . Access retains the newly created owner-private audience; public example content does not mean the Site audience was made public. The native deployment verifies hosting; private remote inference remains unconfigured. The packager required a top-level supported `dist/` static root; `scripts/stage-site.mjs` stages only the built frontend. No private data or native Python worker is included in the hosted artifact.
+
+## Live playback metrics extension
+
+Added schema 1.1 per-PTS ball **image** speed (px/s), approximate player ground speed/path, and reviewed-contact shot depth. Three derivative tests cover VFR timing, missing/interpolated gaps and absent/implausible ground geometry. The actual worker/export/review smoke test checks derived sample counts, versioned CSV, and depth cleared on rejection. Total local suite: 25 passed. The public example derives the new samples from the retained measured observations, then rerenders the annotated video; separate postprocessing took 5.051 s. The prior 84.614 s inference timing remains provenance of that recorded run, not a claimed new benchmark. No streaming-camera inference, physical airborne speed or 3D depth is asserted.
+
+Browser validation of live samples: at 6.500 s the demo rendered 640 px/s ball image motion, 4.8 km/h approximate near-player speed and 12.2 m observed path. A single PTS step to 6.533 s updated these to 920 px/s, 5.8 km/h and 12.3 m. Missing far-player speed stayed unavailable. The real clip has no independently confirmed contact annotation, so shot depth correctly stayed unavailable; the actual worker/review integration test verifies depth calculation for a manually reviewed calibrated contact and clears it on rejection. These values are demonstration of synchronization, not extra validation of detection accuracy.
