@@ -61,3 +61,49 @@ def test_player_velocity_robust_window_reduces_footpoint_jitter():
     assert velocity(points, 16, True) == pytest.approx(2, abs=0.1)
     points[-1].state = "missing"
     assert velocity(points, 16, True) is None
+
+
+def test_path_integral_rejects_stationary_footpoint_jitter():
+    from baseline_lab.analytics.live import live_metrics
+    from baseline_lab.contracts import Metadata, Result, Track
+
+    times = [i / 30 for i in range(90)]
+    observations = [point(t, (2 if i % 2 else -2)) for i, t in enumerate(times)]
+    meta = Metadata(
+        width=640,
+        height=480,
+        duration_s=3,
+        codec="fixture",
+        frames=90,
+        nominal_fps=30,
+        variable_frame_rate=False,
+        rotation_deg=0,
+        timestamps_s=times,
+        original_pts=list(range(90)),
+        time_base="1/30",
+    )
+    r = Result(
+        metadata=meta,
+        tracks=[
+            Track(
+                id=identity,
+                observations=[p.model_copy(deep=True) for p in observations],
+                coverage=1,
+                distance_m=3.56 if identity != "ball" else None,
+            )
+            for identity in ["ball", "near", "far"]
+        ],
+        events=[],
+        calibration=None,
+        warnings=[],
+        provenance={},
+        elapsed_s=0,
+    )
+    values = live_metrics(r)
+    assert values[-1].near_observed_distance_m < 0.1
+    assert r.tracks[1].distance_m < 0.1
+    assert r.provenance["raw_footpoint_path_m"]["near"] == 3.56
+    observations = [point(t, 200 * t) for t in times]
+    r.tracks[1].observations = observations
+    values = live_metrics(r)
+    assert values[-1].near_observed_distance_m == pytest.approx(2 * (89 / 30 - 2 / 30), abs=0.1)

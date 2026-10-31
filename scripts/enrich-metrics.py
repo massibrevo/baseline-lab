@@ -22,9 +22,11 @@ r = Result.model_validate_json((args.analysis / "result.json").read_text())
 r.schema_version = "1.3"
 r.live_metrics = live_metrics(r)
 update_quality(r)
-r.shots = shot_signals(r)
+r.shots = sorted(
+    shot_signals(r) + [s for s in r.shots if s.status == "reviewed"], key=lambda s: s.t_s
+)
 r.provenance["derived_metrics"] = (
-    "live-playback-v1; px/s ball image motion; court-plane player m/s; real PTS"
+    "live-playback-v2; robust player m/s and integrated path; research ball km/h separate; real PTS"
 )
 for name in ["review.mp4", "raw-detections.json"]:
     if (args.analysis / name).exists():

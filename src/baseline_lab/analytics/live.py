@@ -95,7 +95,7 @@ def live_metrics(result: Result) -> list[LiveMetrics]:
     observed = 0
     cumulative = {"near": 0.0, "far": 0.0}
     segments = {"near": 0, "far": 0}
-    samples = []
+    samples: list[LiveMetrics] = []
     filtered_speeds: dict[str, tuple[float, float]] = {}
     for i, point in enumerate(ball):
         observed += point.state == "detected"
@@ -115,9 +115,11 @@ def live_metrics(result: Result) -> list[LiveMetrics]:
                 a, b = points[i - 1], points[i]
                 dt = b.t_s - a.t_s
                 if a.state == b.state == "detected" and a.court_m and b.court_m and 0 < dt <= 0.10:
-                    displacement = distance(a.court_m, b.court_m)
-                    if displacement / dt <= 12:
-                        cumulative[identity] += displacement
+                    prior_speed = (
+                        getattr(samples[-1], f"{identity}_speed_m_s", None) if samples else None
+                    )
+                    if raw_speed is not None and prior_speed is not None:
+                        cumulative[identity] += (prior_speed + raw_speed) * 0.5 * dt
                         segments[identity] += 1
         image_speed = velocity(ball, i, False)
         samples.append(
@@ -151,4 +153,17 @@ def live_metrics(result: Result) -> list[LiveMetrics]:
                 },
             )
         )
+    result.provenance.setdefault(
+        "raw_footpoint_path_m", {t.id: t.distance_m for t in result.tracks if t.id != "ball"}
+    )
+    result.provenance["player_path_method"] = (
+        "integral of robust smoothed ground speed over adjacent observed links; "
+        "excludes warmup and missing geometry/observations; approximate"
+    )
+    for track in result.tracks:
+        if track.id in cumulative:
+            track.distance_m = cumulative[track.id] if segments[track.id] else None
+            track.distance_reason = (
+                None if segments[track.id] else "insufficient_contiguous_velocity_support"
+            )
     return samples
