@@ -15,3 +15,5 @@ apps/web/dist/
 .openai/local*
 .openai/*.local.*
 .DS_Store
+
+dist/
