@@ -11,6 +11,13 @@ export interface BallSpeedSample {
   support_end_s: number | null;
   reprojection_rms_px: number | null
 }
+export interface DisplayTrailPoint {
+  t_s: number;
+  frame: number;
+  xy_px: [number, number] | null;
+  state: 'observed' | 'interpolated' | 'inferred' | 'unavailable';
+  reason: string | null
+}
 export interface Event {
   id: string;
   t_s: number;
@@ -124,7 +131,12 @@ export interface ShotSignal {
   evidence_score: number;
   score_semantics: string;
   image_speed_px_s: number | null;
-  original_prediction: Record<string, any> | null
+  original_prediction: Record<string, any> | null;
+  context_start_s: number | null;
+  context_end_s: number | null;
+  recognition_basis: string | null;
+  model_scores: Record<string, number>;
+  technique: string | null
 }
 export interface Track {
   id: string;
@@ -134,7 +146,7 @@ export interface Track {
   distance_reason: string | null
 }
 export interface Analysis {
-  schema_version: '1.0' | '1.1' | '1.2' | '1.3';
+  schema_version: '1.0' | '1.1' | '1.2' | '1.3' | '1.4';
   metadata: Metadata;
   tracks: (Track)[];
   events: (Event)[];
@@ -144,6 +156,9 @@ export interface Analysis {
   provenance: Record<string, any>;
   live_metrics: (LiveMetrics)[];
   shots: (ShotSignal)[];
+  automatic_shots: (ShotSignal)[];
+  display_ball_trail: (DisplayTrailPoint)[];
+  stroke_analysis: Record<string, any>;
   ball_speed_estimates: (BallSpeedSample)[];
   speed_analysis: Record<string, any>;
   ball_speed_m_s: number | null;

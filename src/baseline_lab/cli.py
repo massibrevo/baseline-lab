@@ -35,10 +35,12 @@ def main():
         from baseline_lab.vision.ball import provision_ball
         from baseline_lab.vision.detectors import provision
         from baseline_lab.vision.pose import provision_pose
+        from baseline_lab.vision.strokes import provision_strokes
 
         print(provision(cfg.data_dir / "models"))
         print(provision_pose(cfg.data_dir / "models"))
         print(provision_ball(cfg.data_dir / "models"))
+        print(provision_strokes(cfg.data_dir / "models"))
     elif args.command == "serve":
         import uvicorn
 

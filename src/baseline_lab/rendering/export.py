@@ -9,11 +9,36 @@ import cv2
 import numpy as np
 
 from baseline_lab.contracts import BallSpeedSample, Result
+from baseline_lab.rendering.trail import visual_trail
 from baseline_lab.video.media import frames
 from baseline_lab.vision.pose import draw_pose
 
 
 def csvs(result: Result, directory: Path) -> None:
+    with (directory / "visual-trail.csv").open("w", newline="") as trail_file:
+        writer = csv.writer(trail_file)
+        writer.writerow(
+            [
+                "time_s",
+                "frame",
+                "display_x_px",
+                "display_y_px",
+                "display_state",
+                "reason",
+                "purpose",
+            ]
+        )
+        for visual_point in result.display_ball_trail:
+            writer.writerow(
+                [
+                    visual_point.t_s,
+                    visual_point.frame,
+                    *(visual_point.xy_px or (None, None)),
+                    visual_point.state,
+                    visual_point.reason,
+                    "visualization_only_not_measurement",
+                ]
+            )
     with (directory / "ball-speed.csv").open("w", newline="") as speeds:
         writer = csv.writer(speeds)
         fields = list(BallSpeedSample.model_fields)
@@ -29,13 +54,17 @@ def csvs(result: Result, directory: Path) -> None:
                 "time_s",
                 "frame",
                 "player",
-                "reviewed_or_unknown_type",
+                "stroke_type",
                 "image_speed_px_s",
                 "status",
                 "method",
+                "label_source",
+                "context_start_s",
+                "context_end_s",
+                "recognition_basis",
             ]
         )
-        for shot in result.shots:
+        for shot in sorted(result.automatic_shots + result.shots, key=lambda s: s.t_s):
             writer.writerow(
                 [
                     shot.id,
@@ -46,6 +75,14 @@ def csvs(result: Result, directory: Path) -> None:
                     shot.image_speed_px_s,
                     shot.status,
                     shot.method,
+                    "automatic"
+                    if shot in result.automatic_shots
+                    else "human_review"
+                    if shot.status == "reviewed"
+                    else "unclassified_candidate",
+                    shot.context_start_s,
+                    shot.context_end_s,
+                    shot.recognition_basis,
                 ]
             )
     with (directory / "keypoints.csv").open("w", newline="") as poses:
@@ -206,6 +243,9 @@ def csvs(result: Result, directory: Path) -> None:
 
 def annotated(source: Path, target: Path, result: Result, checkpoint) -> None:
     meta = result.metadata
+    display = result.display_ball_trail or visual_trail(
+        result.tracks[0].observations, meta.width, meta.height
+    )
     with av.open(str(target), "w") as out:
         stream = out.add_stream(
             "libx264", rate=Fraction(str(meta.nominal_fps or 30)).limit_denominator()
@@ -227,19 +267,37 @@ def annotated(source: Path, target: Path, result: Result, checkpoint) -> None:
                 cv2.polylines(image, [pts], True, (210, 230, 225), 1, cv2.LINE_AA)
             for track in result.tracks:
                 if track.id == "ball":
-                    tail = track.observations[max(0, i - 120) : i + 1]
+                    tail = display[max(0, i - 300) : i + 1]
                     for a, b in zip(tail, tail[1:], strict=False):
-                        if a.xy_px and b.xy_px and t - b.t_s <= 2 and b.t_s - a.t_s <= 0.1:
-                            start, end = (
+                        if a.xy_px and b.xy_px and t - b.t_s <= 5:
+                            inferred = (
+                                a.state == "inferred"
+                                or b.state == "inferred"
+                                or b.t_s - a.t_s > 0.1
+                            )
+                            color = (112, 186, 245) if inferred else (235, 243, 94)
+                            cv2.line(
+                                image,
                                 tuple(round(v) for v in a.xy_px),
                                 tuple(round(v) for v in b.xy_px),
+                                color,
+                                3,
+                                cv2.LINE_AA,
                             )
-                            color = (
-                                (235, 243, 94)
-                                if a.state == b.state == "detected"
-                                else (140, 155, 135)
-                            )
-                            cv2.line(image, start, end, color, 3, cv2.LINE_AA)
+                    display_point = display[i]
+                    if display_point.state == "inferred" and display_point.xy_px:
+                        location = tuple(round(v) for v in display_point.xy_px)
+                        cv2.circle(image, location, 7, (112, 186, 245), 2, cv2.LINE_AA)
+                        cv2.putText(
+                            image,
+                            "INFERRED DISPLAY",
+                            (location[0] + 10, location[1] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.45,
+                            (112, 186, 245),
+                            1,
+                            cv2.LINE_AA,
+                        )
                 point = track.observations[i]
                 draw_pose(image, point)
                 if point.xy_px:
@@ -281,6 +339,26 @@ def annotated(source: Path, target: Path, result: Result, checkpoint) -> None:
                         1,
                         cv2.LINE_AA,
                     )
+            active = [
+                s
+                for s in result.automatic_shots
+                if s.context_start_s is not None
+                and s.context_end_s is not None
+                and s.context_start_s <= t <= s.context_end_s
+            ]
+            if active:
+                shot = min(active, key=lambda s: abs(s.t_s - t))
+                label = shot.kind.replace("_", " ").upper()
+                cv2.putText(
+                    image,
+                    f"AUTO: {label} | {shot.player} | provisional",
+                    (15, 48),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (69, 239, 216),
+                    1,
+                    cv2.LINE_AA,
+                )
             frame = av.VideoFrame.from_ndarray(image, format="bgr24")
             frame.pts = round(t * 90000)
             frame.time_base = Fraction(1, 90000)

@@ -29,6 +29,7 @@ from baseline_lab.contracts import (
 )
 from baseline_lab.geometry.court import Court
 from baseline_lab.rendering.export import annotated, csvs
+from baseline_lab.rendering.trail import visual_trail
 from baseline_lab.settings import Settings
 from baseline_lab.tracking.association import BallAssociation, Players, summarize
 from baseline_lab.video.camera_recording import CameraRecording
@@ -37,6 +38,7 @@ from baseline_lab.vision.ball import BALL_SHA, TemporalBall
 from baseline_lab.vision.detectors import ColorMotionBall, HOGPlayers, SSDPlayers
 from baseline_lab.vision.people import flow_people
 from baseline_lab.vision.pose import POSE_SHA, PoseEstimator, far_player_regions
+from baseline_lab.vision.strokes import LiveStrokeRecognizer, thumbnail
 
 
 def atomic_json(path: Path, value: dict):
@@ -67,6 +69,7 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
     association = BallAssociation(
         math.hypot(payload["width"], payload["height"]), neural=cfg.player_model == "ssdlite"
     )
+    stroke_engine = LiveStrokeRecognizer(cfg.data_dir / "models")
     ball: list[Observation] = []
     timestamps = []
     raw_timestamps = []
@@ -272,6 +275,20 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                     update_quality(result)
                     result.live_metrics = live_metrics(result)
                     result.shots = shot_signals(result)
+                    if cfg.player_model == "ssdlite":
+                        assert capture_origin is not None
+                        result.automatic_shots, result.stroke_analysis = stroke_engine.update(
+                            [
+                                (captured.t_s - capture_origin, thumbnail(image))
+                                for captured, image in decoded
+                            ],
+                            meta,
+                            players.points,
+                            checkpoint,
+                        )
+                    result.display_ball_trail = visual_trail(
+                        ball, payload["width"], payload["height"], offline=False
+                    )
                     result.ball_speed_estimates, result.speed_analysis = research_speed(
                         result, reference_image, True, offline=False
                     )
@@ -310,6 +327,10 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                             "processing_ms": round((time.monotonic() - stage_start) * 1000),
                             "metrics": result.live_metrics[-1].model_dump(),
                             "shots": [s.model_dump() for s in result.shots[-5:]],
+                            "automatic_shots": [
+                                s.model_dump() for s in result.automatic_shots[-10:]
+                            ],
+                            "stroke_analysis": result.stroke_analysis,
                             "ball_speed": result.ball_speed_estimates[-1].model_dump(),
                             "player_speed_m_s": speeds,
                             "tracks": [
@@ -319,6 +340,9 @@ def run_camera(directory: Path, output: Path, payload: dict, cfg: Settings, chec
                             "events": [e.model_dump() for e in result.events[-20:]],
                             "calibration_valid": court is not None,
                             "calibration": calibration_frames[-1],
+                            "display_ball_trail": [
+                                p.model_dump() for p in result.display_ball_trail[-180:]
+                            ],
                             "ball_trail": [
                                 p.model_dump() for p in ball[-120:] if ball[-1].t_s - p.t_s <= 2
                             ],

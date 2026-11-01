@@ -42,6 +42,7 @@ ARTIFACTS = {
     "raw-detections.json",
     "live-metrics.csv",
     "ball-speed.csv",
+    "visual-trail.csv",
     "shot-quality.csv",
     "keypoints.csv",
     "shots.csv",
@@ -325,7 +326,12 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
             result = Result.model_validate_json((directory / "result.json").read_text())
             shot = next((s for s in result.shots if s.id == shot_id), None)
             if shot is None:
-                raise HTTPException(404, "shot_not_found")
+                prediction = next((s for s in result.automatic_shots if s.id == shot_id), None)
+                if prediction is None:
+                    raise HTTPException(404, "shot_not_found")
+                shot = prediction.model_copy(deep=True)
+                result.shots.append(shot)
+                result.shots.sort(key=lambda s: s.t_s)
             if shot.original_prediction is None:
                 shot.original_prediction = shot.model_dump(exclude={"original_prediction"})
             shot.kind, shot.status = body.kind, "reviewed"
@@ -390,7 +396,7 @@ def create_app(cfg: Settings | None = None) -> FastAPI:
             )
             event.classification = "uncertain"
             event.shot_evidence = body.shot_evidence
-            result.schema_version = "1.3"
+            result.schema_version = "1.4"
             update_quality(result)
             result.live_metrics = live_metrics(result)
             temp = directory / "result.edit.json"

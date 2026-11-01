@@ -163,6 +163,11 @@ class ShotSignal(BaseModel):
     score_semantics: str = "heuristic evidence, not probability"
     image_speed_px_s: float | None = None
     original_prediction: dict | None = None
+    context_start_s: float | None = None
+    context_end_s: float | None = None
+    recognition_basis: str | None = None
+    model_scores: dict[str, float] = {}
+    technique: str | None = None
 
 
 class ShotReview(BaseModel):
@@ -189,8 +194,16 @@ class BallSpeedSample(BaseModel):
     reprojection_rms_px: float | None = None
 
 
+class DisplayTrailPoint(BaseModel):
+    t_s: float
+    frame: int
+    xy_px: Point | None
+    state: Literal["observed", "interpolated", "inferred", "unavailable"]
+    reason: str | None = None
+
+
 class Result(BaseModel):
-    schema_version: Literal["1.0", "1.1", "1.2", "1.3"] = "1.3"
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3", "1.4"] = "1.4"
     metadata: Metadata
     tracks: list[Track]
     events: list[Event]
@@ -200,6 +213,9 @@ class Result(BaseModel):
     provenance: dict
     live_metrics: list[LiveMetrics] = []
     shots: list[ShotSignal] = []
+    automatic_shots: list[ShotSignal] = []
+    display_ball_trail: list[DisplayTrailPoint] = []
+    stroke_analysis: dict = {}
     ball_speed_estimates: list[BallSpeedSample] = []
     speed_analysis: dict = {}
     ball_speed_m_s: float | None = None

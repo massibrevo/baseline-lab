@@ -18,6 +18,7 @@ from baseline_lab.analytics.speed import research_speed
 from baseline_lab.contracts import Calibration, Result
 from baseline_lab.geometry.court import Court
 from baseline_lab.rendering.export import annotated, csvs
+from baseline_lab.rendering.trail import visual_trail
 from baseline_lab.settings import Settings
 from baseline_lab.tracking.association import BallAssociation, Players, interpolate, summarize
 from baseline_lab.video.media import frames, inspect, preview
@@ -227,6 +228,16 @@ def analyze(
     update_quality(result)
     result.live_metrics = live_metrics(result)
     result.shots = shot_signals(result)
+    if cfg.player_model == "ssdlite":
+        from baseline_lab.vision.strokes import recognize_strokes
+
+        result.automatic_shots, result.stroke_analysis = recognize_strokes(
+            source, metadata, players.points, cfg.data_dir / "models", checkpoint
+        )
+    result.display_ball_trail = visual_trail(ball, metadata.width, metadata.height)
+    result.provenance["visual_trail"] = (
+        "display-only shape-preserving bridges and damped end predictions; not measurements"
+    )
     result.ball_speed_estimates, result.speed_analysis = research_speed(
         result, reference_image, real_time_playback
     )

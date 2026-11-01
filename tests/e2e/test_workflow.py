@@ -49,7 +49,7 @@ def test_complete_workflow(config, clip):
     result = c.get(base + "/artifacts/result.json").json()
     assert result["ball_speed_m_s"] is None
     assert len(result["live_metrics"]) == result["metadata"]["frames"]
-    assert result["schema_version"] == "1.3"
+    assert result["schema_version"] == "1.4"
     assert c.get(base + "/result").json()["live_metrics"] == result["live_metrics"]
     for artifact in [
         "annotated.mp4",
@@ -58,6 +58,7 @@ def test_complete_workflow(config, clip):
         "events.csv",
         "live-metrics.csv",
         "ball-speed.csv",
+        "visual-trail.csv",
         "shot-quality.csv",
     ]:
         response = c.get(base + "/artifacts/" + artifact)
@@ -113,7 +114,25 @@ def test_complete_workflow(config, clip):
             "evidence_score": 0.5,
         }
     ]
+    saved["automatic_shots"] = [
+        {
+            "id": "auto-fixture",
+            "t_s": 3.12,
+            "frame": 94,
+            "player": "near",
+            "kind": "backhand",
+            "evidence_score": 0.83,
+            "method": "neural test fixture",
+            "recognition_basis": "neural_impact_candidate",
+        }
+    ]
     result_file.write_text(json.dumps(saved))
+    auto_review = c.patch(base + "/shots/auto-fixture", headers=H, json={"kind": "forehand"})
+    assert auto_review.status_code == 200
+    assert auto_review.json()["automatic_shots"][0]["kind"] == "backhand"
+    copied = next(s for s in auto_review.json()["shots"] if s["id"] == "auto-fixture")
+    assert copied["status"] == "reviewed" and copied["kind"] == "forehand"
+    assert copied["original_prediction"]["kind"] == "backhand"
     other = TestClient(create_app(config))
     other.get("/api/v1/identity")
     assert (
@@ -139,7 +158,7 @@ def test_complete_workflow(config, clip):
         base + "/shots", headers=H, json={"t_s": 2.1, "player": "near", "kind": "forehand"}
     )
     assert annotated.status_code == 200
-    stroke = annotated.json()["shots"][-1]
+    stroke = next(s for s in annotated.json()["shots"] if s["id"].startswith("manual-stroke-"))
     assert stroke["t_s"] == 2.1 and stroke["kind"] == "forehand" and stroke["status"] == "reviewed"
     assert stroke["frame"] == 63
     assert (

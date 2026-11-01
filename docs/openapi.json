@@ -1240,6 +1240,68 @@
         ],
         "title": "Correction"
       },
+      "DisplayTrailPoint": {
+        "properties": {
+          "t_s": {
+            "type": "number",
+            "title": "T S"
+          },
+          "frame": {
+            "type": "integer",
+            "title": "Frame"
+          },
+          "xy_px": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xy Px"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "interpolated",
+              "inferred",
+              "unavailable"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t_s",
+          "frame",
+          "xy_px",
+          "state"
+        ],
+        "title": "DisplayTrailPoint"
+      },
       "Event": {
         "properties": {
           "id": {
@@ -2068,10 +2130,11 @@
               "1.0",
               "1.1",
               "1.2",
-              "1.3"
+              "1.3",
+              "1.4"
             ],
             "title": "Schema Version",
-            "default": "1.3"
+            "default": "1.4"
           },
           "metadata": {
             "$ref": "#/components/schemas/Metadata"
@@ -2145,6 +2208,28 @@
             "type": "array",
             "title": "Shots",
             "default": []
+          },
+          "automatic_shots": {
+            "items": {
+              "$ref": "#/components/schemas/ShotSignal"
+            },
+            "type": "array",
+            "title": "Automatic Shots",
+            "default": []
+          },
+          "display_ball_trail": {
+            "items": {
+              "$ref": "#/components/schemas/DisplayTrailPoint"
+            },
+            "type": "array",
+            "title": "Display Ball Trail",
+            "default": []
+          },
+          "stroke_analysis": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Stroke Analysis",
+            "default": {}
           },
           "ball_speed_estimates": {
             "items": {
@@ -2412,6 +2497,58 @@
               }
             ],
             "title": "Original Prediction"
+          },
+          "context_start_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Start S"
+          },
+          "context_end_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context End S"
+          },
+          "recognition_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recognition Basis"
+          },
+          "model_scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Model Scores",
+            "default": {}
+          },
+          "technique": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Technique"
           }
         },
         "type": "object",

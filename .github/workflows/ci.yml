@@ -30,4 +30,5 @@ jobs:
       - name: Frontend install and production build
         run: |
           npm ci --prefix apps/web
+          npm test --prefix apps/web
           npm run build --prefix apps/web

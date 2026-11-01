@@ -85,3 +85,24 @@ pose:
   redistribution: checkpoint not included; explicit setup-models fetch only
   measurements: 17 image joints and 2D knee angles; no measured 3D anatomy; ankle
     ground point approximate
+stroke:
+  adapter: StrokeRecognizer
+  architecture: F3ED RegNetY-002 + TSM + bidirectional GRU, LCL and MLC heads
+  publication: https://proceedings.iclr.cc/paper_files/paper/2025/hash/1c8e2cd11daf2d0a8c68663d504a841d-Abstract-Conference.html
+  reference_revision: 04c6013d0aab13a3f92be58aed958becbcac392d
+  upstream: https://github.com/F3Set/F3Set
+  checkpoint: https://drive.google.com/file/d/1QM9FSHpZ0e6WWaNepUdIsORc56B4GPEK/view
+  filename: f3ed-tennis-049.pt
+  size_bytes: 22649709
+  sha256: 74539f80559615312aa3ad2631bfe96be4eff3f713dd05797340a9676c8711b8
+  serialization: torch.load(weights_only=True); strict known architecture; no remote Python
+  code: original inference implementation; timm 1.0.27 Apache-2.0; TSM MIT notice retained
+  weight_license: author-distributed research checkpoint; no separate permissive grant asserted
+  redistribution: weights and training footage are not included in Git or Sites
+  preprocessing: real-PTS resampling at 12.5 Hz; RGB; height 224; center crop/pad 224; ImageNet normalization
+  temporal: 96-frame windows, 48-frame overlap, shift 2, original/mirrored probability-score averaging
+  contextual_refinement: disabled without independently verified handedness
+  automatic_inputs: video pixels, PTS and observed player skeletons; no user stroke labels, event corrections or calibration
+  output: provisional forehand/backhand/serve/overhead/volley or unknown; clip-edge swing distinct from impact candidate
+  measurement_policy: stroke predictions do not produce shot depth, physical speed, spin or forced-error attribution
+  limitations: broadcast-trained, novel camera angles and occlusion can fail; scores are not calibrated probabilities or accuracy
