@@ -103,3 +103,46 @@ def visual_trail(
             )
         )
     return output
+
+
+def draw_broadcast_trail(image, points: list[DisplayTrailPoint], now: float, seconds: float = 2):
+    """Single-hue, antialiased quadratic display path; never a measurement input."""
+    import cv2
+    import numpy as np
+
+    visible = [p for p in points if now - seconds <= p.t_s <= now and p.xy_px is not None]
+    if not visible:
+        return
+    scale = image.shape[1] / 1000
+    color = np.array([255, 231, 94], np.float32)  # BGR, same #5ee7ff as the browser.
+    xy = np.array([p.xy_px for p in visible], np.float32)
+    margin = math.ceil(18 * scale)
+    left, top = np.maximum(0, np.floor(xy.min(0)).astype(int) - margin)
+    right, bottom = np.minimum(
+        [image.shape[1], image.shape[0]], np.ceil(xy.max(0)).astype(int) + margin + 1
+    )
+    layer = np.zeros((bottom - top, right - left), np.uint8)
+    origin = np.array([left, top])
+    start = xy[0]
+    u = np.linspace(0, 1, 9)[:, None]
+    for i, control in enumerate(xy):
+        end = (control + xy[i + 1]) / 2 if i + 1 < len(xy) else control
+        curve = (1 - u) ** 2 * start + 2 * (1 - u) * u * control + u**2 * end
+        age = max(0, min(1, 1 - (now - visible[i].t_s) / seconds))
+        cv2.polylines(
+            layer,
+            [np.rint(curve - origin).astype(np.int32)],
+            False,
+            round(255 * (0.18 + 0.82 * age)),
+            max(1, round((0.9 + 1.9 * math.sqrt(age)) * scale)),
+            cv2.LINE_AA,
+        )
+        start = end
+    head = tuple(np.rint(xy[-1] - origin).astype(int))
+    cv2.circle(layer, head, max(1, round(2.5 * scale)), 255, -1, cv2.LINE_AA)
+    cv2.circle(layer, head, max(2, round(5 * scale)), 255, max(1, round(scale)), cv2.LINE_AA)
+    alpha = layer.astype(np.float32) / 255
+    halo = cv2.GaussianBlur(alpha, (0, 0), max(1, 3 * scale))
+    opacity = np.minimum(1, alpha + halo * 0.65)[..., None]
+    roi = image[top:bottom, left:right]
+    roi[:] = np.clip(roi * (1 - opacity) + color * opacity, 0, 255).astype(np.uint8)

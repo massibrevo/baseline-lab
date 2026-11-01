@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 from baseline_lab.contracts import BallSpeedSample, Result
-from baseline_lab.rendering.trail import visual_trail
+from baseline_lab.rendering.trail import draw_broadcast_trail, visual_trail
 from baseline_lab.video.media import frames
 from baseline_lab.vision.pose import draw_pose
 
@@ -267,44 +267,12 @@ def annotated(source: Path, target: Path, result: Result, checkpoint) -> None:
                 cv2.polylines(image, [pts], True, (210, 230, 225), 1, cv2.LINE_AA)
             for track in result.tracks:
                 if track.id == "ball":
-                    tail = display[max(0, i - 300) : i + 1]
-                    for a, b in zip(tail, tail[1:], strict=False):
-                        if a.xy_px and b.xy_px and t - b.t_s <= 5:
-                            inferred = (
-                                a.state == "inferred"
-                                or b.state == "inferred"
-                                or b.t_s - a.t_s > 0.1
-                            )
-                            color = (112, 186, 245) if inferred else (235, 243, 94)
-                            cv2.line(
-                                image,
-                                tuple(round(v) for v in a.xy_px),
-                                tuple(round(v) for v in b.xy_px),
-                                color,
-                                3,
-                                cv2.LINE_AA,
-                            )
-                    display_point = display[i]
-                    if display_point.state == "inferred" and display_point.xy_px:
-                        location = tuple(round(v) for v in display_point.xy_px)
-                        cv2.circle(image, location, 7, (112, 186, 245), 2, cv2.LINE_AA)
-                        cv2.putText(
-                            image,
-                            "INFERRED DISPLAY",
-                            (location[0] + 10, location[1] - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.45,
-                            (112, 186, 245),
-                            1,
-                            cv2.LINE_AA,
-                        )
+                    draw_broadcast_trail(image, display[: i + 1], t)
                 point = track.observations[i]
                 draw_pose(image, point)
                 if point.xy_px:
                     x, y = (int(v) for v in point.xy_px)
-                    if track.id == "ball":
-                        cv2.circle(image, (x, y), 6, (69, 239, 216), 2, cv2.LINE_AA)
-                    elif point.bbox_px:
+                    if track.id != "ball" and point.bbox_px:
                         x1, y1, x2, y2 = (int(v) for v in point.bbox_px)
                         cv2.rectangle(image, (x1, y1), (x2, y2), (165, 142, 108), 2)
                         cv2.putText(
