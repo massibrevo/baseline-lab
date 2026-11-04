@@ -4,6 +4,7 @@ import {displayTrail,drawTrail,drawBallHead,TRAIL_COLOR,type TrailMode} from './
 import {activeStroke,strokeTitle,strokeEvidence,type StrokeSource} from './strokes';
 import {drawPose} from './pose';
 import {shotPanel,latestSpeed} from './shot-panel';
+import {courtActivityView,type CourtLayer,type PlayerFilter} from './court-activity';
 import {evidenceForm,readEvidence,qualityView,demoQuality} from './shot-quality';
 import type {Analysis, Event as Bounce, Observation} from './contracts';
 
@@ -18,6 +19,7 @@ let corners:number[][] = [], picked:[number,number]|null = null;
 let trailStyle:TrailMode='continuous';
 let trailSeconds=2;
 let strokeSource:StrokeSource='automatic';
+let courtLayer:CourtLayer='movement',courtPlayer:PlayerFilter='both';
 let sessionMeta:any = null;
 let pollTimer:number|undefined;
 let renderedFrame=-1, panelPaint=0;
@@ -53,13 +55,18 @@ function shell() {
   <section class="live-desk"><div class="stroke-mode"><label for="stroke-source">STROKE SOURCE</label><select id="stroke-source" aria-label="Stroke source"><option value="automatic">Automatic · learned video model</option><option value="reviewed">Human reviewed labels</option></select><span id="stroke-model-note"></span></div><div class="section-label"><span>LIVE MEASUREMENTS</span><small id="live-clock">SYNCHRONIZED TO VIDEO</small></div><div class="live-grid" id="live-metrics"></div><p class="small muted" id="live-evidence"></p></section>  <div class="overlay-bar"><span>OVERLAYS</span>${Object.keys(overlays).map(k=>`<label><input type="checkbox" checked data-overlay="${k}"><span>${k}</span></label>`).join('')}<select id="trail" aria-label="Ball trail style"><option value="continuous">Smooth continuous trail</option><option value="observed">Measured track only</option><option value="points">Observed points</option></select><select id="trail-length" aria-label="Trail duration"><option value="2" selected>2 seconds</option><option value="5">5 seconds</option><option value="999">Full rally</option></select><span class="trail-legend">Smooth cyan trail · includes inferred motion</span></div>
   <section class="timeline"><div class="section-label"><span>RALLY TIMELINE</span><small>Click to seek · ← → step · Space play</small></div><div id="timeline" class="timeline-track" role="slider" tabindex="0" aria-label="Video timeline" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><canvas id="coverage"></canvas><div id="event-ticks"></div><i id="playhead"></i></div><div class="timeline-scale"><span>00:00</span><span id="half-time">—</span><span id="end-time">—</span></div><div class="legend"><span><i class="solid"></i>Observed ball</span><span><i class="dashed"></i>Interpolated</span><span><i class="event-dot"></i>Review event</span><span class="legend-right">Gaps = missing observations</span></div></section>
 <section class="shot-quality-panel" id="shot-quality" aria-live="polite"></section><div class="metrics" id="metrics"></div><section class="detail-section" id="detail"></section></section>
-  <aside class="inspector"><section id="shot-panel" class="shot-panel"></section><button class="button full" id="mark-stroke">＋ Mark stroke type</button><section class="court-panel"><div class="section-label"><span>02 <b>COURT VIEW</b></span><small>METERS</small></div><div id="minimap"></div><div class="court-key"><span><i class="near-dot"></i>Near</span><span><i class="far-dot"></i>Far</span></div><p class="muted small" id="court-note">Grounded player footpoints only. Airborne ball stays in image space.</p></section>
+  <aside class="inspector"><section class="court-panel"><div class="section-label"><span>02 <b>COURT VIEW</b></span><small>METERS</small></div><div class="court-controls"><label>View<select id="court-layer" aria-label="Court visualization"><option value="movement">Movement · last 3 s</option><option value="heatmap">Time heatmap</option><option value="strokes">Stroke positions</option></select></label><label>Players<select id="court-player" aria-label="Court player filter"><option value="both">Both players</option><option value="near">Near player</option><option value="far">Far player</option></select></label></div><div id="minimap"></div><div id="court-summary"></div><div class="court-key"><span><i class="near-dot"></i>Near</span><span><i class="far-dot"></i>Far</span></div><p class="muted small" id="court-note">Grounded player footpoints only. Airborne ball stays in image space.</p></section><section id="shot-panel" class="shot-panel"></section><button class="button full" id="mark-stroke">＋ Mark stroke type</button>
   <section class="review-panel"><div class="section-label"><span>EVENT REVIEW</span><span id="event-count">—</span></div><div id="event-list"></div><button class="button full" id="add-event">＋ Mark ground contact</button><div id="event-editor"></div></section>
   <section class="quality-panel"><div class="section-label"><span>SIGNAL QUALITY</span><span class="estimate">ESTIMATES</span></div><div id="quality"></div><p class="small muted">Scores describe model output, not calibrated probabilities. This is a review tool.</p></section></aside></div>
   <footer><span>BASELINE LAB <i>—</i> A study in seeing the game.</span><span>Space to play · Arrows to step</span></footer></section></main>
   <dialog id="dialog"><button id="close-dialog" class="dialog-close" aria-label="Close dialog">×</button><div id="dialog-content"></div></dialog>`;
   $('#shot-panel').onclick=e=>{const button=(e.target as Element).closest<HTMLButtonElement>('[data-seek-shot]');if(button){$<HTMLVideoElement>('#video').pause();seek(Number(button.dataset.seekShot));}const review=(e.target as Element).closest<HTMLButtonElement>('[data-review-shot]');if(review)reviewStroke(review.dataset.reviewShot!);};
   $('#mark-stroke').onclick=()=>reviewStroke();
+  $<HTMLSelectElement>('#court-layer').onchange=e=>{courtLayer=(e.target as HTMLSelectElement).value as CourtLayer;renderMinimap();};
+  $<HTMLSelectElement>('#court-player').onchange=e=>{courtPlayer=(e.target as HTMLSelectElement).value as PlayerFilter;renderMinimap();};
+  const seekCourt=(e:Event)=>{const mark=(e.target as Element).closest<SVGElement>('[data-court-seek]');if(mark){e.preventDefault();$<HTMLVideoElement>('#video').pause();seek(Number(mark.dataset.courtSeek));}};
+  $('#minimap').onclick=seekCourt;
+  $('#minimap').onkeydown=e=>{if(e.key==='Enter'||e.key===' ')seekCourt(e);};
   $('#live-metrics').onclick=e=>{const action=(e.target as Element).closest<HTMLButtonElement>('[data-measurement-action]')?.dataset.measurementAction;if(action==='depth')reviewDepth();if(action==='stroke')reviewStroke();if(action==='speed')speedDetails();};
   $('#shot-quality').onclick=e=>{if((e.target as Element).closest('[data-measurement-action="depth"]'))reviewDepth();};
   $('#desk').onclick=()=>selectTab('overview');
@@ -184,11 +191,10 @@ function speedDetails(){
 }
 function renderMinimap(){
   if(!result)return;
-  const spot=(p:[number,number],color:string,label:string)=>`<circle cx="${35+p[0]/8.23*140}" cy="${20+p[1]/23.77*300}" r="5" fill="${color}"/><text x="${45+p[0]/8.23*140}" y="${24+p[1]/23.77*300}" fill="#F3F0E6" font-size="8">${label}</text>`;
-  let spots='';for(const t of result.tracks.filter(t=>t.id!=='ball')){const p=t.observations[frame];if(p?.court_m)spots+=spot(p.court_m,t.id==='near'?'#D8EF45':'#C86C45',t.id.toUpperCase());}
-  for(const e of result.events)if(e.court_m&&e.status!=='rejected'&&e.status!=='candidate')spots+=spot(e.court_m,'#F3F0E6','');
-  $('#minimap').innerHTML=`<svg viewBox="0 -60 210 465" aria-label="Singles court minimap"><rect y="-60" width="210" height="465" fill="#21493D"/><g fill="none" stroke="#C2C9B8" stroke-width="1"><rect x="15" y="20" width="180" height="300"/><rect x="35" y="20" width="140" height="300"/><path d="M35 87H175M35 253H175M105 87V253M10 170H200"/></g><path d="M10 170H200" stroke="#F3F0E6" stroke-dasharray="2 2" stroke-width="2"/><text x="105" y="12" text-anchor="middle" fill="#AEBEAE" font-size="7" letter-spacing="2">FAR BASELINE</text><text x="105" y="337" text-anchor="middle" fill="#AEBEAE" font-size="7" letter-spacing="2">NEAR BASELINE</text>${spots}${!result.calibration?'<text x="105" y="160" text-anchor="middle" fill="#F3F0E6" font-size="10">Calibration unavailable</text><text x="105" y="185" text-anchor="middle" fill="#C2C9B8" font-size="8">No metric positions plotted</text>':''}</svg>`;
-  $('#court-note').textContent=result.calibration?'Approximate footpoints. Unvalidated manual calibration; ball contact appears only after human review.':'No calibration. Player meters and ground-contact locations are unavailable.';
+  const view=courtActivityView(result,frame,$<HTMLVideoElement>('#video').currentTime,courtLayer,courtPlayer,strokeSource);
+  $('#minimap').innerHTML=view.svg;
+  $('#court-summary').innerHTML=view.summaries;
+  $('#court-note').textContent=view.note;
 }
 function renderCoverage(){
   if(!result)return;const cv=$<HTMLCanvasElement>('#coverage');cv.width=Math.max(1,cv.clientWidth*devicePixelRatio);cv.height=56*devicePixelRatio;const c=cv.getContext('2d')!;

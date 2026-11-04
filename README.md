@@ -12,6 +12,8 @@ The current update adds **RTMPose body skeletons, WASB temporal tennis-ball heat
 
 This is an experimental research release, **not a validated tennis perception system**. Ball localization and distant-player pose can still fail, especially with occlusion, screen controls and multiple practice balls. A high observed-track coverage is not accuracy. See [executed verification](docs/verification.md), [provisional measurements](docs/evaluation-provisional.json), and [model selection](docs/model-selection.md).
 
+The interactive **court activity dashboard** adds time-weighted player heatmaps, recent movement paths, source-separated stroke counts and click-to-seek stroke footpoints/reviewed bounces. Use the court view and player filters beside the video; all history follows the playhead. See the [critical badminton-project review](docs/badminton-review.md) for adopted ideas and rejected model/rule changes.
+
 ## Run locally
 
 Prerequisites: Git, **Python 3.12.14**, **uv 0.13.6**, Node **22.12.0+** and npm. No paid API keys or system FFmpeg are needed: the pinned imageio-ffmpeg wheel supplies FFmpeg. Download dependencies, the 14 MB person checkpoint, 54 MB pose graph and 6 MB tennis checkpoint once; processing then works offline.

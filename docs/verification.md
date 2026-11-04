@@ -35,3 +35,18 @@ The running API was verified listening only at **127.0.0.1:8000**. A pattern sca
 Public source: https://github.com/massibrevo/baseline-lab. CI runs lint, types, offline tests, generated-contract consistency and frontend build; real-model tests are opt-in. The Site retains its owner-private audience and contains only the licensed precomputed example/frontend. Private hosted Python inference is not deployed. Docker configuration exists but was not built/run because no Docker daemon was available. Peak memory was not measured. No paid providers or external video-inference requests were used.
 
 The broadcast-style visual update uses a single cyan quadratic path with a soft halo and tapered tail in canvas, SVG, camera and video exports. Inference remains identifiable in status/data and observed-only mode. It changes no detector, observations or measurement calculations. Existing geometry, source-separation and lifecycle checks were rerun; real-model inference was not repeated for this rendering-only change.
+
+
+## Court activity adaptation — 4 November 2026
+
+Reviewed Badminton-AI-Analytics at `038b27b11b5fbe6b56eb6a5f32dcf21f9399d198`; see [critical source comparison](badminton-review.md). No model replacement, new dependency, upstream code copy or measurement change. Added interactive time heatmaps, recent player paths, player filters, source-separated stroke counts, mapped-time support and accessible seekable stroke footpoints/reviewed bounces. Court activity appears immediately beside the video.
+
+Executed for this change:
+
+- 51 offline Python checks pass; 3 real-model checks deliberately skipped for this frontend-only change. Ruff lint/format, mypy (32 modules), generated contract and production web build pass.
+- 12 frontend checks pass, including five new scientific/interaction-data regressions: timestamp weighting independent of frame rate, exclusion of gaps/invalid mappings/jumps, backwards seeking without future evidence, automatic/reviewed/boundary separation, and footpoint-only plot inputs.
+- Real local browser: existing private session loads; video readyState 4 with no media error; movement/heatmap/stroke modes work; selecting a far-player filter hides near data; keyboard Enter on a 4.96-second stroke marker seeks to 4.960 and rolls counts/support/path back. Accessible SVG marker buttons are exposed. No console errors observed. API and worker restarted on local loopback.
+- Pure calculation plus SVG-string rendering benchmark on the 375-frame public example: 1,000 mixed-layer snapshots in 62.03 ms, mean 0.062 ms per snapshot in local Node. This excludes browser DOM/layout/paint, decoding and CV inference and is not a playback latency benchmark. Association links are cached; UI keeps its existing bounded panel update cadence.
+- Raw tracks, speed/depth evidence and existing annotated media were not regenerated or changed. Private footage, measurements and proof screenshot remain local, outside Git/Site. Hosted demo continues to contain only the attributed public example.
+
+No CV accuracy improvement is claimed: upstream supplies no tennis comparative model benchmark. The delivered improvement is interactive court analytics with explicit evidence support.

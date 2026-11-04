@@ -27,3 +27,7 @@ Current research models: RTMPose-m graph from OpenMMLab / Tau-J's maintainer mir
 ## F3ED stroke recognition
 
 [F3Set / F3ED](https://github.com/F3Set/F3Set), Zhaoyu Liu, Kan Jiang, Murong Ma, Zhe Hou, Yun Lin and Jin Song Dong, ICLR 2025, supplies the separately downloaded tennis research checkpoint. Our inference architecture implementation uses timm RegNet (Apache-2.0) and standard PyTorch layers; the temporal shift operation follows MIT HAN Lab's TSM, whose [MIT notice](licenses/tsm-MIT.txt) is retained. Upstream training scripts are not bundled. The checkpoint is loaded only as checksum-verified weights with `weights_only=True`. Its training-video rights and the author's research release are separate from this project's MIT code license; no blanket permissive license over the weights or dataset is asserted. Neither checkpoint nor training footage is redistributed in Git or Sites. Contextual refinement requiring verified handedness is disabled. See [model details](docs/stroke-recognition.md).
+
+## Badminton dashboard reference
+
+[Muhammad Rahman Shahid / Badminton-AI-Analytics](https://github.com/muhammadrahman-hehe/Badminton-AI-Analytics/tree/038b27b11b5fbe6b56eb6a5f32dcf21f9399d198) was reviewed for general dashboard ideas. The inspected revision has no license file. No source code, model weights or media were copied. Our court activity module is an original implementation using existing Baseline Lab observations. See [critical review](docs/badminton-review.md).
